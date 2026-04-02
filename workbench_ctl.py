@@ -52,9 +52,11 @@ def main() -> int:
         "restart-experiment",
         "stop-experiment",
     ])
+    parser.add_argument("experiment_id_arg", nargs="?", default=None, help="Experiment id for experiment-scoped actions")
     parser.add_argument("--base-url", default="http://127.0.0.1:8080", help="Workbench base URL")
     parser.add_argument("--experiment-id", default=None, help="Experiment id for experiment-scoped actions")
     args = parser.parse_args()
+    experiment_id = args.experiment_id_arg or args.experiment_id
 
     try:
         if args.action == "status":
@@ -82,10 +84,10 @@ def main() -> int:
             verb, target = action_target(args.action)
             control_payload = {"target": target, "action": verb}
             if target == "experiment":
-                if not args.experiment_id:
-                    print(json.dumps({"ok": False, "error": "--experiment-id is required for experiment actions"}))
+                if not experiment_id:
+                    print(json.dumps({"ok": False, "error": "experiment id is required for experiment actions"}))
                     return 1
-                control_payload["experiment_id"] = args.experiment_id
+                control_payload["experiment_id"] = experiment_id
             payload = fetch_json(f"{args.base_url}/api/workbench/control", method="POST", payload=control_payload)
     except error.URLError as exc:
         print(json.dumps({"ok": False, "error": str(exc.reason)}))
