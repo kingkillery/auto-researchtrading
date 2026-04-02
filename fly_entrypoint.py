@@ -256,6 +256,55 @@ def pid_is_running(pid: int | None) -> bool:
     return True
 
 
+def process_commandline(pid: int | None) -> str:
+    pid = safe_int(pid)
+    if pid is None or pid <= 0:
+        return ""
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    f"$proc = Get-CimInstance Win32_Process -Filter \"ProcessId = {pid}\" | Select-Object -ExpandProperty CommandLine; if ($proc) {{ $proc }}",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return ""
+        return result.stdout.strip()
+    proc_path = Path("/proc") / str(pid) / "cmdline"
+    if proc_path.exists():
+        try:
+            return proc_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", errors="ignore").strip()
+        except OSError:
+            return ""
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip()
+
+
+def pid_matches_command(pid: int | None, required_tokens: list[str]) -> bool:
+    if not pid_is_running(pid):
+        return False
+    commandline = process_commandline(pid).lower()
+    if not commandline:
+        return False
+    return all(token.lower() in commandline for token in required_tokens if token)
+
+
 def terminate_pid_tree(pid: int | None) -> bool:
     pid = safe_int(pid)
     if pid is None or pid <= 0:
@@ -318,7 +367,7 @@ def acquire_workbench_lock() -> None:
         except FileExistsError:
             existing = read_json(WORKBENCH_LOCK_PATH, {})
             existing_pid = safe_int(existing.get("pid"))
-            if existing_pid is not None and pid_is_running(existing_pid) and existing_pid != os.getpid():
+            if existing_pid is not None and pid_matches_command(existing_pid, ["fly_entrypoint.py"]) and existing_pid != os.getpid():
                 raise RuntimeError(
                     f"workbench already running with pid={existing_pid} on http://127.0.0.1:{PORT}/. "
                     "Stop the existing launcher before starting another one."
@@ -578,7 +627,7 @@ class WorkbenchSupervisor:
 
     def _status_manager_pid(self) -> int | None:
         manager_pid = safe_int(self._experiment_status().get("pid"))
-        if manager_pid is None or not pid_is_running(manager_pid):
+        if manager_pid is None or not pid_matches_command(manager_pid, ["experiment_manager.py", str(self.experiment_status_path)]):
             return None
         return manager_pid
 
@@ -609,10 +658,10 @@ class WorkbenchSupervisor:
             summary = dict(manager_state.get("summary", {}))
             leader = next((item for item in experiments if item.get("id") == summary.get("leader_id")), None)
             manager_snapshot = self.experiment_manager.snapshot()
-            manager_pid = safe_int(manager_state.get("pid"))
             manager_running = bool(manager_snapshot.get("running"))
+            manager_pid = self._status_manager_pid()
             if manager_pid is not None:
-                manager_running = pid_is_running(manager_pid)
+                manager_running = True
                 manager_snapshot["pid"] = manager_pid
                 manager_snapshot["running"] = manager_running
                 manager_snapshot["returncode"] = None if manager_running else manager_snapshot.get("returncode")

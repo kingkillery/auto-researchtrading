@@ -220,15 +220,65 @@ def pid_is_running(pid: int | None) -> bool:
     return True
 
 
+def process_commandline(pid: int | None) -> str:
+    pid = safe_int(pid)
+    if pid is None or pid <= 0:
+        return ""
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    f"$proc = Get-CimInstance Win32_Process -Filter \"ProcessId = {pid}\" | Select-Object -ExpandProperty CommandLine; if ($proc) {{ $proc }}",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return ""
+        return result.stdout.strip()
+    proc_path = Path("/proc") / str(pid) / "cmdline"
+    if proc_path.exists():
+        try:
+            return proc_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", errors="ignore").strip()
+        except OSError:
+            return ""
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip()
+
+
+def pid_matches_command(pid: int | None, required_tokens: list[str]) -> bool:
+    if not pid_is_running(pid):
+        return False
+    commandline = process_commandline(pid).lower()
+    if not commandline:
+        return False
+    return all(token.lower() in commandline for token in required_tokens if token)
+
+
 def active_manager_pid(lock_path: Path, status_path: Path) -> tuple[int | None, str | None]:
+    required_tokens = ["experiment_manager.py", str(status_path)]
     lock_payload = read_json(lock_path, {})
     lock_pid = safe_int(lock_payload.get("pid"))
-    if lock_pid is not None and pid_is_running(lock_pid):
+    if lock_pid is not None and pid_matches_command(lock_pid, required_tokens):
         return lock_pid, "lock"
 
     status_payload = read_json(status_path, {})
     status_pid = safe_int(status_payload.get("pid"))
-    if status_pid is not None and pid_is_running(status_pid):
+    if status_pid is not None and pid_matches_command(status_pid, required_tokens):
         return status_pid, "status"
 
     return None, None

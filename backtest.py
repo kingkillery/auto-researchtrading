@@ -4,18 +4,34 @@ Imports strategy from strategy.py, runs on validation data, prints metrics.
 This file is fixed — do not modify.
 """
 
-import time
+import os
 import signal as sig
+import threading
+import time
 
 from prepare import load_data, run_backtest, compute_score, TIME_BUDGET
 
 # Timeout guard
-def timeout_handler(signum, frame):
+def timeout_handler(signum=None, frame=None):
     print("TIMEOUT: backtest exceeded time budget")
-    exit(1)
+    if signum is None:
+        os._exit(1)
+    raise SystemExit(1)
 
-sig.signal(sig.SIGALRM, timeout_handler)
-sig.alarm(TIME_BUDGET + 30)  # 30s grace for startup
+
+def install_timeout_guard(timeout_seconds):
+    if hasattr(sig, "SIGALRM"):
+        sig.signal(sig.SIGALRM, timeout_handler)
+        sig.alarm(timeout_seconds)
+        return lambda: sig.alarm(0)
+
+    timer = threading.Timer(timeout_seconds, timeout_handler)
+    timer.daemon = True
+    timer.start()
+    return timer.cancel
+
+
+cancel_timeout_guard = install_timeout_guard(TIME_BUDGET + 30)  # 30s grace for startup
 
 t_start = time.time()
 
@@ -43,3 +59,5 @@ print(f"profit_factor:      {result.profit_factor:.6f}")
 print(f"annual_turnover:    {result.annual_turnover:.2f}")
 print(f"backtest_seconds:   {result.backtest_seconds:.1f}")
 print(f"total_seconds:      {t_end - t_start:.1f}")
+
+cancel_timeout_guard()

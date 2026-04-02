@@ -46,4 +46,4 @@ These are intended for inspection and charting, not as replacements for the exis
 - Historical 5-minute OHLCV currently comes from Binance's public market-data API because the Hyperliquid candle API does not return the repo's older 2024-2025 intraday window.
 - Sharpe and turnover annualization are recalculated for a 5-minute cadence.
 - The fixed `compute_score()` function is still used, so 5-minute runs are directionally comparable to the repo's existing score semantics even though the data cadence differs.
-- The fixed `uv run backtest.py` path still exists for the official hourly harness. On this Windows host it may fail before execution because `backtest.py` uses `signal.SIGALRM`.
+- The fixed `uv run backtest.py` path still exists for the official hourly harness and now falls back to a timer when `signal.SIGALRM` is unavailable.
