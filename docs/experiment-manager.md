@@ -7,6 +7,9 @@ control plane instead of a single trainer loop.
 
 - `uv run python experiment_manager.py`
   Runs the local experiment manager for the 10 fixed Jupiter paper threads.
+- `uv run python fly_entrypoint.py`
+  Launches the local workbench, which now embeds a bundled generative dashboard
+  artifact on top of the base control surface.
 - `uv run python workbench_ctl.py list-experiments`
   Lists the current thread states from the workbench API.
 - `uv run python workbench_ctl.py start-experiment --experiment-id <id>`
@@ -90,6 +93,25 @@ Each entry defines:
 - `paper_budget_usd`
 - `split`
 - `search_space`
+
+## Generative dashboard artifact
+
+The workbench now serves a bundled React artifact from:
+
+- `/artifacts/dashboard-generative-ui.html`
+
+That artifact is built from:
+
+- [`artifacts/dashboard-generative-ui/src/App.tsx`](/C:/Dev/Desktop-Projects/Auto-Research-Trading/artifacts/dashboard-generative-ui/src/App.tsx)
+- [`artifacts/dashboard-generative-ui/src/App.css`](/C:/Dev/Desktop-Projects/Auto-Research-Trading/artifacts/dashboard-generative-ui/src/App.css)
+- [`artifacts/dashboard-generative-ui/bundle.html`](/C:/Dev/Desktop-Projects/Auto-Research-Trading/artifacts/dashboard-generative-ui/bundle.html)
+
+To rebuild it:
+
+1. `cd artifacts/dashboard-generative-ui`
+2. `npm install`
+3. `npm run build`
+4. `npm run bundle`
 
 ## Current limitation
 

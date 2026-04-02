@@ -1,0 +1,65 @@
+:root {
+  color-scheme: dark;
+  --bg: #081420;
+  --panel: rgba(8, 18, 31, 0.78);
+  --line: rgba(131, 155, 181, 0.16);
+  --text: #edf4fb;
+  --muted: #93a9c3;
+  --accent: #45d0a1;
+  --gold: #d8b45f;
+  --danger: #ff7b72;
+  --heading: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  --body: "Aptos", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  --mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+
+  font-family: var(--body);
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(69, 208, 161, 0.1), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(216, 180, 95, 0.12), transparent 28%),
+    linear-gradient(180deg, #06111c, var(--bg));
+  color: var(--text);
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: inherit;
+}
+
+code,
+pre {
+  font-family: var(--mono);
+}

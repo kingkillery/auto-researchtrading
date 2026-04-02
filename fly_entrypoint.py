@@ -32,6 +32,7 @@ RESEARCH_PATH = ROOT / "autoresearch-results.tsv"
 EQUITY_PATH = ROOT / "equity_curve.csv"
 BASELINE_PATH = ROOT / "equity_curve_baseline.csv"
 WORKBENCH_TEMPLATE_PATH = ROOT / "dashboard_template.html"
+GENERATIVE_ARTIFACT_PATH = ROOT / "artifacts" / "dashboard-generative-ui" / "bundle.html"
 WORKBENCH_ROOT = Path.home() / ".cache" / "autotrader" / "workbench"
 WORKBENCH_LOCK_PATH = WORKBENCH_ROOT / "workbench.lock.json"
 WORKBENCH_LOCK_FD: int | None = None
@@ -860,8 +861,15 @@ class FlyPaperHandler(BaseHTTPRequestHandler):
         if route == "/api/workbench/status":
             self._send_json(HTTPStatus.OK, WORKBENCH.status())
             return
-        if route == "/assets/logo.png" and LOGO_PATH.exists():
+        if route in {"/assets/logo.png", "/favicon.ico"} and LOGO_PATH.exists():
             self._send_bytes(HTTPStatus.OK, LOGO_PATH.read_bytes(), "image/png")
+            return
+        if route == "/artifacts/dashboard-generative-ui.html" and GENERATIVE_ARTIFACT_PATH.exists():
+            self._send_bytes(
+                HTTPStatus.OK,
+                GENERATIVE_ARTIFACT_PATH.read_bytes(),
+                "text/html; charset=utf-8",
+            )
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
