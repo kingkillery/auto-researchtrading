@@ -27,6 +27,9 @@ The manager persists three local message surfaces under
 - `experiments-events.jsonl`
   Append-only event stream for starts, completes, pauses, restarts, stops, and
   degraded runs.
+- `experiment-manager.lock.json`
+  Singleton lock metadata. Start-up now cross-checks both the lock file and the
+  live status pid so a stale lock cannot mask an already-running manager.
 
 The control shape is:
 
@@ -46,17 +49,25 @@ Each experiment snapshot includes:
 
 - `id`
 - `state`
+- `phase`
+- `phase_detail`
 - `desired_state`
 - `iteration`
 - `hypothesis`
 - `objective`
 - `symbols`
 - `last_metrics`
+- `best_score`
+- `best_metrics`
+- `last_verification`
+- `last_decision`
 - `last_started_at`
 - `last_completed_at`
 - `last_error`
 - `degraded`
 - `degraded_reasons`
+- `health`
+- `health_reasons`
 
 Each event row includes:
 

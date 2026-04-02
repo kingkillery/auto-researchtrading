@@ -1,0 +1,92 @@
+[
+  {
+    "id": "perps-trend-follow",
+    "hypothesis": "Continuation after short-term strength works best when exits trail slowly and leverage stays capped.",
+    "objective": "paper_pnl_risk_adjusted",
+    "symbols": ["SOL"],
+    "paper_budget_usd": 10000,
+    "split": "val",
+    "search_space": "trend_following"
+  },
+  {
+    "id": "perps-mean-revert",
+    "hypothesis": "Short-lived exhaustion reversals outperform trend chasing when hold times stay tight.",
+    "objective": "paper_pnl_risk_adjusted",
+    "symbols": ["SOL"],
+    "paper_budget_usd": 10000,
+    "split": "val",
+    "search_space": "mean_reversion"
+  },
+  {
+    "id": "perps-regime-switch",
+    "hypothesis": "A volatility gate can switch between breakout and reversion logic more reliably than one static policy.",
+    "objective": "paper_pnl_risk_adjusted",
+    "symbols": ["BTC", "ETH", "SOL"],
+    "paper_budget_usd": 15000,
+    "split": "val",
+    "search_space": "regime_switching"
+  },
+  {
+    "id": "perps-borrow-decay",
+    "hypothesis": "Carry-aware hold limits reduce decay from expensive funding windows.",
+    "objective": "paper_pnl_risk_adjusted",
+    "symbols": ["BTC", "ETH", "SOL"],
+    "paper_budget_usd": 12000,
+    "split": "val",
+    "search_space": "carry_aware_exits"
+  },
+  {
+    "id": "perps-impact-aware-sizing",
+    "hypothesis": "Sizing down around poor liquidity conditions protects paper Sharpe more than forcing full entries.",
+    "objective": "paper_pnl_risk_adjusted",
+    "symbols": ["BTC", "ETH", "SOL"],
+    "paper_budget_usd": 12000,
+    "split": "val",
+    "search_space": "impact_aware_sizing"
+  },
+  {
+    "id": "perps-liquidation-buffer",
+    "hypothesis": "A larger volatility-adjusted liquidation buffer improves survivability without killing return.",
+    "objective": "paper_pnl_risk_adjusted",
+    "symbols": ["BTC", "ETH", "SOL"],
+    "paper_budget_usd": 10000,
+    "split": "val",
+    "search_space": "liquidation_buffer"
+  },
+  {
+    "id": "perps-limit-pullback",
+    "hypothesis": "Pullback-style entries with restrained hold times produce cleaner paper fills than market chasing.",
+    "objective": "paper_pnl_risk_adjusted",
+    "symbols": ["SOL"],
+    "paper_budget_usd": 10000,
+    "split": "val",
+    "search_space": "limit_pullback"
+  },
+  {
+    "id": "perps-relative-strength",
+    "hypothesis": "Relative-strength rotation across BTC, ETH, and SOL concentrates exposure into the cleanest perp trend.",
+    "objective": "paper_pnl_risk_adjusted",
+    "symbols": ["BTC", "ETH", "SOL"],
+    "paper_budget_usd": 15000,
+    "split": "val",
+    "search_space": "relative_strength_rotation"
+  },
+  {
+    "id": "perps-compression-breakout",
+    "hypothesis": "Volatility compression followed by expansion creates the highest-conviction perp breakout entries.",
+    "objective": "paper_pnl_risk_adjusted",
+    "symbols": ["SOL"],
+    "paper_budget_usd": 10000,
+    "split": "val",
+    "search_space": "compression_breakout"
+  },
+  {
+    "id": "perps-failure-reversal",
+    "hypothesis": "Failed breakout reversals outperform naive fades when invalidation is fast and deterministic.",
+    "objective": "paper_pnl_risk_adjusted",
+    "symbols": ["SOL"],
+    "paper_budget_usd": 10000,
+    "split": "val",
+    "search_space": "failure_reversal"
+  }
+]

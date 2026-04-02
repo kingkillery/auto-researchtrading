@@ -71,8 +71,11 @@ def main() -> int:
                     {
                         "id": item.get("id"),
                         "state": item.get("state"),
+                        "phase": item.get("phase"),
                         "desired_state": item.get("desired_state"),
-                        "score": (item.get("last_metrics") or {}).get("score"),
+                        "candidate_score": (item.get("last_metrics") or {}).get("score"),
+                        "accepted_best_score": item.get("best_score"),
+                        "decision": (item.get("last_decision") or {}).get("status"),
                         "last_completed_at": item.get("last_completed_at"),
                         "degraded": item.get("degraded"),
                     }

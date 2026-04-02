@@ -22,129 +22,51 @@
     * { box-sizing: border-box; }
     body {
       margin: 0;
+      color: var(--text);
       background:
         radial-gradient(circle at top left, rgba(69,208,161,0.16), transparent 28%),
         radial-gradient(circle at top right, rgba(215,179,93,0.14), transparent 26%),
         linear-gradient(180deg, #081322, #050b13);
-      color: var(--text);
     }
-    .shell { max-width: 1480px; margin: 0 auto; padding: 24px; }
-    .hero, .card, .metric, .control {
+    .shell { max-width: 1520px; margin: 0 auto; padding: 24px; }
+    .hero, .card, .metric {
       border: 1px solid var(--line);
       border-radius: 24px;
       background: var(--panel);
       box-shadow: 0 24px 70px rgba(0,0,0,0.22);
+      padding: 20px;
     }
-    .hero { padding: 28px; margin-bottom: 18px; }
-    .hero-grid, .metrics, .layout, .stack, .controls, .control-grid {
+    .hero-grid, .metrics, .layout, .control-grid, .experiment-grid {
       display: grid;
       gap: 16px;
     }
-    .hero-grid { grid-template-columns: 1.5fr 1fr; align-items: end; }
+    .hero-grid { grid-template-columns: 1.45fr 1fr; align-items: end; }
+    .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 18px 0; }
+    .layout { grid-template-columns: 1.15fr 1fr; }
+    .control-grid, .experiment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .brand { display: flex; gap: 16px; align-items: center; }
     .brand img {
-      width: 76px; height: 76px; object-fit: contain;
-      border-radius: 18px; background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.08); padding: 8px;
+      width: 72px; height: 72px; object-fit: contain;
+      border-radius: 18px; padding: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
     }
-    .eyebrow {
-      font-size: 12px; text-transform: uppercase; letter-spacing: .14em; color: var(--gold);
-    }
-    h1 { margin: 8px 0 0; font-size: clamp(2.1rem, 4vw, 3.8rem); line-height: .95; letter-spacing: -.05em; }
-    .copy, .muted { color: var(--muted); line-height: 1.6; }
-    .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
-    .metric, .card, .control { padding: 20px; }
-    .layout { grid-template-columns: 1.55fr 1fr; }
-    .stack { grid-auto-rows: min-content; }
-    .label { color: var(--muted); font-size: .84rem; margin-bottom: 10px; }
+    .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .14em; color: var(--gold); }
+    h1 { margin: 8px 0 0; font-size: clamp(2.2rem, 4vw, 3.8rem); line-height: .96; letter-spacing: -.05em; }
+    .copy, .muted { color: var(--muted); line-height: 1.55; }
+    .title { margin: 0 0 8px; font-size: 1rem; font-weight: 700; }
+    .label { color: var(--muted); font-size: .84rem; margin-bottom: 8px; }
     .value { font-size: clamp(1.35rem, 2vw, 2rem); font-weight: 700; letter-spacing: -.04em; }
     .foot { color: var(--muted); font-size: .83rem; margin-top: 8px; }
-    .title { margin: 0 0 6px; font-size: 1rem; font-weight: 700; }
-    .row, .top, .footer { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+    .action-list, .position-list, .event-list, .experiment-grid { display: grid; gap: 12px; }
+    .panel, .position, .event, .experiment, .meta-box {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      background: var(--panel-soft);
+    }
+    .row, .topline, .footer { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
     .footer { margin-top: 18px; color: var(--muted); font-size: .82rem; flex-wrap: wrap; }
-    .actions, .positions, .processes { display: grid; gap: 12px; }
-    .experiments { display: grid; gap: 14px; }
-    .action, .position, .empty, .meta, .process {
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 14px;
-      background: var(--panel-soft);
-    }
-    .exp-card {
-      display: grid;
-      gap: 12px;
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 16px;
-      background: var(--panel-soft);
-    }
-    .exp-grid {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .exp-grid .meta {
-      min-height: 74px;
-    }
-    .exp-controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .pill {
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: .82rem;
-      border: 1px solid rgba(255,255,255,0.08);
-    }
-    .long, .running { color: var(--accent); background: rgba(69,208,161,0.1); }
-    .short, .stopped, .error { color: var(--danger); background: rgba(255,123,114,0.11); }
-    .flat, .paused, .idle { color: var(--warn); background: rgba(255,204,102,0.11); }
-    .chart {
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 14px;
-      background: rgba(4, 12, 21, 0.72);
-    }
-    svg { width: 100%; height: auto; display: block; }
-    table { width: 100%; border-collapse: collapse; font-size: .92rem; }
-    th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-    th { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-    td:last-child, th:last-child { text-align: right; }
-    .status { font-weight: 600; text-transform: capitalize; }
-    .status.keep { color: var(--accent); }
-    .status.discard { color: var(--muted); }
-    .status.crash { color: var(--danger); }
-    .controls { margin-bottom: 18px; }
-    .control-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .control-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: flex-start;
-      margin-bottom: 4px;
-    }
-    .control-head .muted { margin: 0; }
-    .guard {
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(215, 179, 93, 0.25);
-      background: rgba(215, 179, 93, 0.08);
-      color: #f0d392;
-      font-size: .76rem;
-      line-height: 1.35;
-      white-space: nowrap;
-    }
-    .control-hint {
-      margin-top: 10px;
-      padding: 10px 12px;
-      border-radius: 14px;
-      border: 1px solid rgba(69,208,161,0.16);
-      background: rgba(69,208,161,0.06);
-      color: #c9f3e5;
-      font-size: .82rem;
-      line-height: 1.45;
-    }
     .button-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
     button {
       cursor: pointer;
@@ -152,26 +74,41 @@
       border-radius: 999px;
       background: rgba(255,255,255,0.04);
       color: var(--text);
-      padding: 10px 14px;
+      padding: 9px 13px;
       font: inherit;
-      transition: transform .16s ease, border-color .16s ease, background .16s ease, opacity .16s ease;
     }
-    button:hover { border-color: rgba(69,208,161,0.5); transform: translateY(-1px); }
-    button:disabled {
-      opacity: .42;
-      cursor: not-allowed;
-      transform: none;
-      border-color: rgba(255,255,255,0.08);
-      filter: saturate(.7);
-    }
+    button:hover { border-color: rgba(69,208,161,0.5); }
     button.primary { background: rgba(69,208,161,0.12); border-color: rgba(69,208,161,0.22); }
     button.warn { background: rgba(255,204,102,0.12); border-color: rgba(255,204,102,0.22); }
     button.danger { background: rgba(255,123,114,0.12); border-color: rgba(255,123,114,0.22); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .pill {
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: .8rem;
+      border: 1px solid rgba(255,255,255,0.08);
+      text-transform: capitalize;
+    }
+    .running, .healthy, .open { color: var(--accent); background: rgba(69,208,161,0.10); }
+    .paused, .idle, .degraded { color: var(--warn); background: rgba(255,204,102,0.10); }
+    .stopped, .failed, .closed { color: var(--danger); background: rgba(255,123,114,0.10); }
+    .empty { color: var(--muted); padding: 8px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    th, td { text-align: left; padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    td:last-child, th:last-child { text-align: right; }
+    .chart {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      background: rgba(4,12,21,0.72);
+    }
+    svg { width: 100%; height: auto; display: block; }
     pre {
       margin: 12px 0 0;
       padding: 12px;
       border-radius: 14px;
-      background: rgba(4, 12, 21, 0.74);
+      background: rgba(4,12,21,0.74);
       color: #d7deea;
       overflow: auto;
       font-size: .8rem;
@@ -179,14 +116,8 @@
       border: 1px solid var(--line);
       white-space: pre-wrap;
     }
-    .command {
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-      color: #d7deea;
-      font-size: .84rem;
-    }
-    @media (max-width: 1080px) {
-      .hero-grid, .metrics, .layout, .control-grid { grid-template-columns: 1fr; }
-      .exp-grid { grid-template-columns: 1fr; }
+    @media (max-width: 1180px) {
+      .hero-grid, .metrics, .layout, .control-grid, .experiment-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -198,138 +129,105 @@
           <div class="brand">
             <img src="/assets/logo.png" alt="Auto Research Trading logo">
             <div>
-              <div class="eyebrow">Auto Research Trading Workbench</div>
-              <h1>One launcher, one UI, ten isolated experiments.</h1>
+              <div class="eyebrow">Python Message-Based Supervisor</div>
+              <h1>Ten Jupiter paper experiments, one local control plane.</h1>
             </div>
           </div>
           <p class="copy">
-            The dashboard now supervises the paper feed plus a message-based experiment manager. Each thread gets its own
-            state, lifecycle, and controls without sharing writable research state with the others.
+            The workbench now supervises the paper feed and a message-based experiment manager. Each research thread has
+            isolated control, status, events, and artifact paths instead of sharing one trainer slot.
           </p>
-          <div class="control-hint" style="margin-top:16px">
-            Autostart is on by default. Launching the workbench starts the UI, the paper feed, and the experiment manager together unless you disable it with <span class="command">WORKBENCH_AUTOSTART=0</span>.
-          </div>
         </div>
-        <div class="actions" id="actions"></div>
-      </div>
-    </section>
-
-    <section class="controls">
-      <div class="control-grid">
-        <article class="control">
-          <div class="control-head">
-            <div>
-              <div class="title">Paper Feed Control</div>
-              <p class="muted">Managed process for the Jupiter paper-mode loop.</p>
-            </div>
-            <div class="guard">Guarded: start locks out while running</div>
-          </div>
-          <div class="control-hint" id="paper-control-hint">Start relaunches a stopped feed. Restart is for a clean relaunch of an active feed. Stop halts the managed loop.</div>
-          <div id="paper-process"></div>
-          <div class="button-row">
-            <button id="paper-start-btn" class="primary" onclick="sendControl('paper','start')">Start paper feed</button>
-            <button id="paper-restart-btn" class="warn" onclick="sendControl('paper','restart')">Restart paper feed</button>
-            <button id="paper-stop-btn" class="danger" onclick="sendControl('paper','stop')">Stop paper feed</button>
-          </div>
-          <pre class="command">uv run python workbench_ctl.py status
-uv run python workbench_ctl.py restart-paper</pre>
-        </article>
-        <article class="control">
-          <div class="control-head">
-            <div>
-              <div class="title">Experiment Manager</div>
-              <p class="muted">Message-backed lifecycle manager for the 10 isolated Jupiter research threads.</p>
-            </div>
-            <div class="guard">Guarded: manager state fans out to threads</div>
-          </div>
-          <div class="control-hint" id="manager-control-hint">Start launches the experiment manager, restart recreates the manager process, and stop halts all experiment orchestration.</div>
-          <div id="manager-process"></div>
-          <div class="button-row">
-            <button id="manager-start-btn" class="primary" onclick="sendControl('experiment-manager','start')">Start manager</button>
-            <button id="manager-restart-btn" class="warn" onclick="sendControl('experiment-manager','restart')">Restart manager</button>
-            <button id="manager-stop-btn" class="danger" onclick="sendControl('experiment-manager','stop')">Stop manager</button>
-          </div>
-          <pre class="command">uv run python workbench_ctl.py start-manager
-uv run python workbench_ctl.py stop-manager</pre>
-        </article>
+        <div class="action-list" id="actions"></div>
       </div>
     </section>
 
     <section class="metrics">
       <article class="metric">
-        <div class="label">Best strategy score</div>
-        <div class="value" id="best-score">--</div>
-        <div class="foot" id="best-foot">Waiting for results</div>
-      </article>
-      <article class="metric">
         <div class="label">Paper equity</div>
-        <div class="value" id="live-equity">--</div>
-        <div class="foot" id="equity-foot">Paper engine snapshot</div>
+        <div class="value" id="paper-equity">--</div>
+        <div class="foot" id="paper-foot">Current paper engine snapshot</div>
       </article>
       <article class="metric">
-        <div class="label">Experiments tracked</div>
-        <div class="value" id="exp-count">--</div>
-        <div class="foot" id="exp-foot">Leaderboard activity</div>
+        <div class="label">Leader</div>
+        <div class="value" id="leader-id">--</div>
+        <div class="foot" id="leader-foot">Best experiment by score</div>
       </article>
       <article class="metric">
-        <div class="label">Baseline return</div>
-        <div class="value" id="base-return">--</div>
-        <div class="foot" id="base-foot">Reference curve</div>
+        <div class="label">Running experiments</div>
+        <div class="value" id="active-count">--</div>
+        <div class="foot" id="active-foot">Current live threads</div>
+      </article>
+      <article class="metric">
+        <div class="label">Failed experiments</div>
+        <div class="value" id="failed-count">--</div>
+        <div class="foot" id="failed-foot">Threads needing attention</div>
+      </article>
+    </section>
+
+    <section class="control-grid">
+      <article class="card">
+        <div class="title">Paper Feed Control</div>
+        <p class="muted">Managed Jupiter paper feed. Use this for a clean relaunch of the shared market surface.</p>
+        <div id="paper-process"></div>
+        <div class="button-row">
+          <button class="primary" onclick="sendControl('paper','start')">Start</button>
+          <button class="warn" onclick="sendControl('paper','restart')">Restart</button>
+          <button class="danger" onclick="sendControl('paper','stop')">Stop</button>
+        </div>
+      </article>
+      <article class="card">
+        <div class="title">Experiment Manager Control</div>
+        <p class="muted">Top-level manager process for the ten isolated threads.</p>
+        <div id="manager-process"></div>
+        <div class="button-row">
+          <button class="primary" onclick="sendControl('experiment-manager','start')">Start manager</button>
+          <button class="warn" onclick="sendControl('experiment-manager','restart')">Restart manager</button>
+          <button class="danger" onclick="sendControl('experiment-manager','stop')">Stop manager</button>
+        </div>
       </article>
     </section>
 
     <section class="layout">
-      <div class="stack">
-        <article class="card">
-          <div class="title">Equity comparison</div>
-          <p class="muted">Use this to see whether the current strategy is compounding or just surviving.</p>
-          <div class="chart">
-            <div class="footer"><span id="eq-left">Current strategy</span><span id="eq-right">Baseline</span></div>
-            <svg viewBox="0 0 760 280" aria-label="Equity curve comparison">
-              <g id="grid"></g>
-              <path id="base-path" fill="none" stroke="var(--gold)" stroke-width="3" stroke-linecap="round"></path>
-              <path id="curve-path" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"></path>
-            </svg>
-          </div>
-        </article>
-        <article class="card">
-          <div class="title">Experiment leaderboard</div>
-          <p class="muted">Top experiments only. Keep the wins visible.</p>
-          <div id="leaders"></div>
-        </article>
-        <article class="card">
-          <div class="title">Recent experiment flow</div>
-          <p class="muted">Message log from the experiment manager and the latest thread events.</p>
-          <div id="recent"></div>
-        </article>
-        <article class="card">
-          <div class="title">Experiment manager</div>
-          <p class="muted">Controls for the 10 isolated research threads.</p>
-          <div id="manager-summary"></div>
-        </article>
-        <article class="card">
-          <div class="title">Experiment threads</div>
-          <p class="muted">Pause, resume, restart, or stop a single thread without touching the others.</p>
-          <div class="experiments" id="experiments"></div>
-        </article>
+      <div class="card">
+        <div class="title">Experiment Threads</div>
+        <p class="muted">Each thread is isolated. Start, pause, resume, restart, or stop one hypothesis without touching the others.</p>
+        <div class="experiment-grid" id="experiments"></div>
       </div>
-      <div class="stack">
+      <div style="display:grid; gap:16px;">
         <article class="card">
-          <div class="title">Paper engine state</div>
-          <p class="muted">Current exposure, cash, and entry context.</p>
-          <div class="positions" id="positions"></div>
+          <div class="title">Paper Engine State</div>
+          <div class="position-list" id="positions"></div>
         </article>
         <article class="card">
-          <div class="title">Research loop health</div>
-          <p class="muted">Manager-side status, event health, and thread degradation flags.</p>
-          <div id="research"></div>
+          <div class="title">Recent Manager Events</div>
+          <div class="event-list" id="events"></div>
         </article>
         <article class="card">
-          <div class="title">Runtime metadata</div>
-          <p class="muted">Make the loaded strategy and state files explicit.</p>
+          <div class="title">Runtime Metadata</div>
           <div id="meta"></div>
         </article>
       </div>
+    </section>
+
+    <section class="layout" style="margin-top:16px;">
+      <article class="card">
+        <div class="title">Existing Leaderboard</div>
+        <p class="muted">Historical strategy experiments from the repo TSV output.</p>
+        <div id="leaders"></div>
+      </article>
+      <article class="card">
+        <div class="title">Equity Comparison</div>
+        <p class="muted">Current strategy versus the baseline equity curve.</p>
+        <div class="chart">
+          <div class="footer"><span id="eq-left">Current strategy</span><span id="eq-right">Baseline</span></div>
+          <svg viewBox="0 0 760 280" aria-label="Equity curve comparison">
+            <g id="grid"></g>
+            <path id="base-path" fill="none" stroke="var(--gold)" stroke-width="3" stroke-linecap="round"></path>
+            <path id="curve-path" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"></path>
+          </svg>
+        </div>
+      </article>
     </section>
 
     <div class="footer">
@@ -342,22 +240,7 @@ uv run python workbench_ctl.py stop-manager</pre>
     const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     const fmtMoney = (v) => Number.isFinite(v) ? money.format(v) : "--";
     const fmtNum = (v, d = 2) => Number.isFinite(v) ? Number(v).toFixed(d) : "--";
-    const fmtPct = (v, d = 1) => Number.isFinite(v) ? `${Number(v).toFixed(d)}%` : "--";
     const setText = (id, val) => { const node = document.getElementById(id); if (node) node.textContent = val; };
-    const controlButtons = {
-      paper: {
-        start: document.getElementById("paper-start-btn"),
-        restart: document.getElementById("paper-restart-btn"),
-        stop: document.getElementById("paper-stop-btn"),
-      },
-      "experiment-manager": {
-        start: document.getElementById("manager-start-btn"),
-        restart: document.getElementById("manager-restart-btn"),
-        stop: document.getElementById("manager-stop-btn"),
-      },
-    };
-    let lastWorkbench = { paper: {}, "experiment-manager": {}, experiments: [] };
-    let workbenchReady = false;
     let controlBusy = false;
 
     function table(headers, rows, empty) {
@@ -365,154 +248,106 @@ uv run python workbench_ctl.py stop-manager</pre>
       return `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
     }
 
+    function stateClass(state, degraded = false) {
+      if (degraded) return "degraded";
+      if (state === "running") return "running";
+      if (state === "paused" || state === "idle") return "paused";
+      if (state === "stopped") return "stopped";
+      return "failed";
+    }
+
+    function formatProcessCard(process, extraRows = []) {
+      const state = process.state || (process.running ? "running" : "stopped");
+      const logTail = (process.log_tail || []).join("\n") || process.last_stdout_tail || process.last_stderr_tail || "No log output yet.";
+      const rows = [
+        `<div class="row"><span>PID</span><strong>${process.pid || "--"}</strong></div>`,
+        `<div class="row"><span>State</span><strong><span class="pill ${stateClass(state)}">${state}</span></strong></div>`,
+        `<div class="row"><span>Return code</span><strong>${process.returncode ?? "--"}</strong></div>`,
+        ...extraRows,
+      ].join("");
+      return `<div class="panel">${rows}<pre>${logTail}</pre></div>`;
+    }
+
     function renderActions(actions) {
-      document.getElementById("actions").innerHTML = (actions || []).map((a) => `
-        <article class="action">
-          <p class="title">${a.title}</p>
-          <p class="muted">${a.detail}</p>
-        </article>
+      document.getElementById("actions").innerHTML = (actions || []).map((item) => `
+        <div class="panel">
+          <div class="title">${item.title}</div>
+          <div class="muted">${item.detail}</div>
+        </div>
       `).join("");
     }
 
+    function renderMetrics(payload) {
+      const manager = payload.workbench.experiment_manager || {};
+      const summary = manager.summary || {};
+      setText("paper-equity", fmtMoney(payload.paper.portfolio?.equity));
+      setText("paper-foot", (payload.paper.positions || []).length ? "Open exposure is active" : "No paper positions open");
+      setText("leader-id", summary.leader_id || "--");
+      setText("leader-foot", summary.leader_score != null ? `Score ${fmtNum(summary.leader_score)}` : "Waiting for experiment metrics");
+      setText("active-count", String(summary.active_count ?? "--"));
+      setText("active-foot", `${summary.experiment_count ?? 0} configured threads`);
+      setText("failed-count", String(summary.failed_count ?? "--"));
+      setText("failed-foot", `${summary.degraded_count ?? 0} degraded, ${summary.drift_count ?? 0} drifted`);
+    }
+
     function renderPositions(payload) {
-      const mount = document.getElementById("positions");
       const positions = payload.paper.positions || [];
-      const portfolio = payload.paper.portfolio || {};
       const engine = payload.paper.engine || {};
-      let html = positions.length
+      const html = positions.length
         ? positions.map((p) => `
             <div class="position">
-              <div class="top"><strong>${p.symbol}</strong><span class="pill ${p.direction.toLowerCase()}">${p.direction}</span></div>
+              <div class="topline"><strong>${p.symbol}</strong><span class="pill ${p.direction === "Flat" ? "paused" : "running"}">${p.direction}</span></div>
               <div class="row"><span>Notional</span><strong>${fmtMoney(p.notional)}</strong></div>
               <div class="row"><span>Entry price</span><strong>${fmtNum(p.entry_price, 4)}</strong></div>
             </div>
           `).join("")
         : `<div class="empty">No paper positions are open yet.</div>`;
-      html += `
-        <div class="meta">
+      document.getElementById("positions").innerHTML = html + `
+        <div class="meta-box">
           <div class="row"><span>Cash</span><strong>${fmtMoney(engine.cash)}</strong></div>
-          <div class="row"><span>Total equity</span><strong>${fmtMoney(portfolio.equity)}</strong></div>
-          <div class="row"><span>Engine timestamp</span><strong>${portfolio.timestamp || "--"}</strong></div>
+          <div class="row"><span>Equity</span><strong>${fmtMoney(payload.paper.portfolio?.equity)}</strong></div>
+          <div class="row"><span>Timestamp</span><strong>${payload.paper.portfolio?.timestamp || "--"}</strong></div>
         </div>
       `;
-      mount.innerHTML = html;
+    }
+
+    function renderEvents(events) {
+      document.getElementById("events").innerHTML = (events || []).length
+        ? events.map((event) => `
+            <div class="event">
+              <div class="topline"><strong>${event.type || "--"}</strong><span class="muted">${event.timestamp || "--"}</span></div>
+              <div class="row"><span>Experiment</span><strong>${event.experiment_id || "manager"}</strong></div>
+              <div class="row"><span>Profile</span><strong>${event.payload?.search_space || "--"}</strong></div>
+              <div class="row"><span>Phase</span><strong>${event.payload?.phase || "--"}</strong></div>
+              <div class="row"><span>Detail</span><strong>${event.payload?.phase_detail || "--"}</strong></div>
+              <div class="row"><span>Decision</span><strong>${event.payload?.decision?.status || "--"}</strong></div>
+              <div class="row"><span>Health</span><strong>${event.payload?.health || "--"}</strong></div>
+            </div>
+          `).join("")
+        : `<div class="empty">No manager events yet.</div>`;
+    }
+
+    function renderMeta(meta, manager) {
+      document.getElementById("meta").innerHTML = `
+        <div class="meta-box">
+          <div class="row"><span>Strategy spec</span><strong>${meta.strategy_spec || "--"}</strong></div>
+          <div class="row"><span>Paper state path</span><strong>${meta.state_path || "--"}</strong></div>
+          <div class="row"><span>Workbench root</span><strong>${meta.workbench_root || "--"}</strong></div>
+          <div class="row"><span>Experiment manifest</span><strong>${meta.experiment_manifest_path || "--"}</strong></div>
+          <div class="row"><span>Events path</span><strong>${manager.events_path || "--"}</strong></div>
+        </div>
+      `;
     }
 
     function renderLeaders(payload) {
-      const rows = (payload.trading.leaders || []).map((r) => `
+      const rows = (payload.trading.leaders || []).map((item) => `
         <tr>
-          <td><strong>${r.commit}</strong><br><span class="status ${r.status}">${r.status}</span></td>
-          <td>${r.description}</td>
-          <td>${fmtNum(r.score)}</td>
+          <td><strong>${item.commit}</strong><br><span class="muted">${item.status}</span></td>
+          <td>${item.description}</td>
+          <td>${fmtNum(item.score)}</td>
         </tr>
       `);
-      document.getElementById("leaders").innerHTML = table(["Commit", "What changed", "Score"], rows, "No leaderboard data yet.");
-    }
-
-    function renderRecent(payload) {
-      const rows = (payload.experiment_events || []).slice(0, 8).map((r) => `
-        <tr>
-          <td><strong>${r.timestamp || "--"}</strong><br><span class="status ${r.type || "idle"}">${r.type || "event"}</span></td>
-          <td>${r.experiment_id || "manager"}</td>
-          <td>${r.payload ? (r.payload.interrupted_reason ?? r.payload.exit_code ?? r.payload.iteration ?? "--") : "--"}</td>
-        </tr>
-      `);
-      document.getElementById("recent").innerHTML = table(["Timestamp", "Thread", "Detail"], rows, "No recent experiment events yet.");
-    }
-
-    function renderResearch(payload) {
-      const summary = payload.research.summary || {};
-      const counts = payload.research.status_counts || {};
-      const manager = payload.workbench["experiment-manager"] || {};
-      const managerSummary = manager.summary || {};
-      const experiments = payload.experiments || [];
-      document.getElementById("research").innerHTML = `
-        <div class="meta">
-          <div class="row"><span>Threads tracked</span><strong>${summary.total_runs ?? "--"}</strong></div>
-          <div class="row"><span>Best paper score</span><strong>${fmtNum(summary.best_val_bpb, 6)}</strong></div>
-          <div class="row"><span>Manager state</span><strong>${manager.state || "--"}</strong></div>
-        </div>
-        <div class="meta">
-          <div class="row"><span>Keeps</span><strong>${counts.keep || 0}</strong></div>
-          <div class="row"><span>Discards</span><strong>${counts.discard || 0}</strong></div>
-          <div class="row"><span>Crashes</span><strong>${counts.crash || 0}</strong></div>
-        </div>
-        <div class="meta">
-          <div class="row"><span>Active threads</span><strong>${managerSummary.active_count ?? 0}</strong></div>
-          <div class="row"><span>Paused threads</span><strong>${managerSummary.paused_count ?? 0}</strong></div>
-          <div class="row"><span>Failed threads</span><strong>${managerSummary.failed_count ?? 0}</strong></div>
-        </div>
-      `;
-      document.getElementById("manager-summary").innerHTML = `
-        <div class="meta">
-          <div class="row"><span>Manager PID</span><strong>${manager.pid || "--"}</strong></div>
-          <div class="row"><span>Leader thread</span><strong>${managerSummary.leader_id || "--"}</strong></div>
-          <div class="row"><span>Leader score</span><strong>${fmtNum(managerSummary.leader_score, 6)}</strong></div>
-          <div class="row"><span>Experiment count</span><strong>${managerSummary.experiment_count ?? experiments.length ?? 0}</strong></div>
-        </div>
-      `;
-      document.getElementById("experiments").innerHTML = experiments.length
-        ? experiments.map((exp) => renderExperimentCard(exp)).join("")
-        : `<div class="empty">No experiment threads reported yet.</div>`;
-    }
-
-    function renderMeta(payload) {
-      const meta = payload.meta || {};
-      document.getElementById("meta").innerHTML = `
-        <div class="meta">
-          <div class="row"><span>Strategy spec</span><strong>${meta.strategy_spec || "--"}</strong></div>
-          <div class="row"><span>State path</span><strong>${meta.state_path || "--"}</strong></div>
-          <div class="row"><span>Workbench root</span><strong>${meta.workbench_root || "--"}</strong></div>
-          <div class="row"><span>Manifest</span><strong>${meta.experiment_manifest_path || "--"}</strong></div>
-          <div class="row"><span>Generated</span><strong>${meta.generated_at || "--"}</strong></div>
-        </div>
-      `;
-    }
-
-    function renderMetrics(payload) {
-      const experiments = payload.experiments || [];
-      const managerSummary = payload.workbench["experiment-manager"]?.summary || {};
-      const summary = payload.trading.summary || {};
-      const leader = experiments.find((item) => item.id === managerSummary.leader_id);
-      setText("best-score", fmtNum(managerSummary.leader_score ?? summary.best_score));
-      setText("best-foot", leader ? `${leader.id} is leading the current paper scoreboard` : (summary.best_description || "Best experiment so far"));
-      setText("live-equity", fmtMoney(payload.paper.portfolio?.equity));
-      setText("equity-foot", (payload.paper.positions || []).length ? "Open exposure is active" : "No paper positions open");
-      setText("exp-count", String(experiments.length || summary.total_experiments || "--"));
-      setText("exp-foot", `${managerSummary.active_count || 0} active, ${managerSummary.paused_count || 0} paused`);
-      setText("base-return", fmtPct(payload.baseline_equity.summary?.return_pct));
-      setText("base-foot", "Return from baseline equity curve");
-      setText("eq-left", `Current return ${fmtPct(payload.equity.summary?.return_pct)}`);
-      setText("eq-right", `Baseline return ${fmtPct(payload.baseline_equity.summary?.return_pct)}`);
-    }
-
-    function renderExperimentCard(exp) {
-      const statusClass = exp.state || "idle";
-      const metrics = exp.last_metrics || {};
-      const controlDisabled = controlBusy;
-      return `
-        <article class="exp-card">
-          <div class="top">
-            <strong>${exp.id}</strong>
-            <span class="pill ${statusClass}">${exp.state || "idle"}</span>
-          </div>
-          <div class="muted">${exp.hypothesis || "--"}</div>
-          <div class="exp-grid">
-            <div class="meta"><div class="row"><span>Desired</span><strong>${exp.desired_state || "--"}</strong></div><div class="row"><span>Split</span><strong>${exp.split || "--"}</strong></div></div>
-            <div class="meta"><div class="row"><span>Score</span><strong>${fmtNum(metrics.score, 6)}</strong></div><div class="row"><span>Return</span><strong>${fmtPct(metrics.total_return_pct)}</strong></div></div>
-            <div class="meta"><div class="row"><span>Trades</span><strong>${metrics.num_trades ?? "--"}</strong></div><div class="row"><span>DD</span><strong>${fmtPct(metrics.max_drawdown_pct)}</strong></div></div>
-            <div class="meta"><div class="row"><span>Completed</span><strong>${exp.last_completed_at || "--"}</strong></div><div class="row"><span>Budget</span><strong>${fmtMoney(exp.paper_budget_usd)}</strong></div></div>
-            <div class="meta"><div class="row"><span>Degraded</span><strong>${exp.degraded ? "yes" : "no"}</strong></div><div class="row"><span>Reason</span><strong>${(exp.degraded_reasons || []).join(", ") || "--"}</strong></div></div>
-          </div>
-          <div class="exp-controls">
-            <button class="primary" data-target="experiment" data-action="start" data-experiment-id="${exp.id}" ${controlDisabled ? "disabled" : ""}>Start</button>
-            <button class="warn" data-target="experiment" data-action="pause" data-experiment-id="${exp.id}" ${controlDisabled ? "disabled" : ""}>Pause</button>
-            <button class="primary" data-target="experiment" data-action="resume" data-experiment-id="${exp.id}" ${controlDisabled ? "disabled" : ""}>Resume</button>
-            <button class="warn" data-target="experiment" data-action="restart" data-experiment-id="${exp.id}" ${controlDisabled ? "disabled" : ""}>Restart</button>
-            <button class="danger" data-target="experiment" data-action="stop" data-experiment-id="${exp.id}" ${controlDisabled ? "disabled" : ""}>Stop</button>
-          </div>
-        </article>
-      `;
+      document.getElementById("leaders").innerHTML = table(["Commit", "Description", "Score"], rows, "No leaderboard data yet.");
     }
 
     function pathFor(points, width, height, pad, min, max) {
@@ -540,138 +375,81 @@ uv run python workbench_ctl.py stop-manager</pre>
       }).join("");
       document.getElementById("curve-path").setAttribute("d", pathFor(current, width, height, pad, min, max));
       document.getElementById("base-path").setAttribute("d", pathFor(baseline, width, height, pad, min, max));
+      setText("eq-left", `Current return ${fmtNum(payload.equity.summary?.return_pct)}%`);
+      setText("eq-right", `Baseline return ${fmtNum(payload.baseline_equity.summary?.return_pct)}%`);
     }
 
-    function formatProcessCard(process, extraRows = []) {
-      const stateClass = process.running ? "running" : (process.state === "paused" ? "paused" : "stopped");
-      const logTail = (process.log_tail || []).join("\n") || process.last_stdout_tail || process.last_stderr_tail || "";
-      const rows = [
-        `<div class="row"><span>PID</span><strong>${process.pid || "--"}</strong></div>`,
-        `<div class="row"><span>State</span><strong><span class="pill ${stateClass}">${process.state || (process.running ? "running" : "stopped")}</span></strong></div>`,
-        `<div class="row"><span>Return code</span><strong>${process.returncode ?? "--"}</strong></div>`,
-        ...extraRows,
-      ].join("");
+    function experimentButtons(exp) {
+      const id = exp.id;
       return `
-        <div class="process">
-          ${rows}
-          <pre>${logTail || "No log output yet."}</pre>
+        <div class="button-row">
+          <button class="primary" onclick="sendControl('experiment','start','${id}')">Start</button>
+          <button class="warn" onclick="sendControl('experiment','pause','${id}')">Pause</button>
+          <button class="primary" onclick="sendControl('experiment','resume','${id}')">Resume</button>
+          <button class="warn" onclick="sendControl('experiment','restart','${id}')">Restart</button>
+          <button class="danger" onclick="sendControl('experiment','stop','${id}')">Stop</button>
         </div>
       `;
     }
 
-    function renderWorkbench(payload) {
-      const paper = payload.workbench.paper || {};
-      const manager = payload.workbench["experiment-manager"] || {};
-      lastWorkbench = { paper, "experiment-manager": manager, experiments: payload.experiments || [] };
-      workbenchReady = true;
+    function renderExperiments(experiments) {
+      document.getElementById("experiments").innerHTML = (experiments || []).map((exp) => `
+        <div class="experiment">
+          <div class="topline">
+            <strong>${exp.id}</strong>
+            <span class="pill ${stateClass(exp.state, exp.degraded)}">${exp.degraded ? "degraded" : (exp.state || "idle")}</span>
+          </div>
+          <div class="muted">${exp.hypothesis || "--"}</div>
+          <div class="row"><span>Symbols</span><strong>${(exp.symbols || []).join(", ") || "--"}</strong></div>
+          <div class="row"><span>Search space</span><strong>${exp.search_space || "--"}</strong></div>
+          <div class="row"><span>Desired / actual</span><strong>${exp.desired_state || "--"} / ${exp.state || "--"}</strong></div>
+          <div class="row"><span>Phase</span><strong>${exp.phase || "--"}</strong></div>
+          <div class="row"><span>Phase detail</span><strong>${exp.phase_detail || "--"}</strong></div>
+          <div class="row"><span>Health</span><strong>${exp.health || "--"}</strong></div>
+          <div class="row"><span>Candidate score</span><strong>${fmtNum((exp.last_metrics || {}).score)}</strong></div>
+          <div class="row"><span>Accepted best</span><strong>${fmtNum(exp.best_score)}</strong></div>
+          <div class="row"><span>Decision</span><strong>${exp.last_decision?.status || "--"}</strong></div>
+          <div class="row"><span>Iteration</span><strong>${exp.iteration ?? "--"}</strong></div>
+          <div class="row"><span>Cycle runtime</span><strong>${fmtNum(exp.cycle_runtime_seconds)}s</strong></div>
+          <div class="row"><span>Phase started</span><strong>${exp.phase_started_at || "--"}</strong></div>
+          <div class="row"><span>Last completed</span><strong>${exp.last_completed_at || "--"}</strong></div>
+          ${exp.last_decision?.reason ? `<div class="muted">Decision reason: ${exp.last_decision.reason}</div>` : ""}
+          ${exp.last_verification?.failed_gates?.length ? `<div class="muted">Verifier rejected: ${exp.last_verification.failed_gates.join(", ")}</div>` : ""}
+          ${exp.degraded_reasons?.length ? `<div class="muted">Degraded: ${exp.degraded_reasons.join(", ")}</div>` : ""}
+          ${exp.health_reasons?.length ? `<div class="muted">Health flags: ${exp.health_reasons.join(", ")}</div>` : ""}
+          ${experimentButtons(exp)}
+        </div>
+      `).join("");
+    }
+
+    function renderWorkbench(workbench) {
+      const paper = workbench.paper || {};
       document.getElementById("paper-process").innerHTML = formatProcessCard(paper, [
         `<div class="row"><span>Command</span><strong>${(paper.command || []).join(" ") || "--"}</strong></div>`
       ]);
+      const manager = workbench.experiment_manager || {};
+      const phaseCounts = Object.entries(manager.summary?.phase_counts || {})
+        .map(([phase, count]) => `${phase}:${count}`)
+        .join(", ");
+      const decisionCounts = Object.entries(manager.summary?.decision_counts || {})
+        .map(([status, count]) => `${status}:${count}`)
+        .join(", ");
       document.getElementById("manager-process").innerHTML = formatProcessCard(manager, [
-        `<div class="row"><span>State</span><strong>${manager.state || "--"}</strong></div>`,
-        `<div class="row"><span>Active</span><strong>${manager.summary?.active_count ?? "--"}</strong></div>`,
-        `<div class="row"><span>Leader</span><strong>${manager.summary?.leader_id || "--"}</strong></div>`
+        `<div class="row"><span>Experiments</span><strong>${manager.summary?.experiment_count ?? "--"}</strong></div>`,
+        `<div class="row"><span>Leader</span><strong>${manager.summary?.leader_id || "--"}</strong></div>`,
+        `<div class="row"><span>Degraded / drifted</span><strong>${manager.summary?.degraded_count ?? 0} / ${manager.summary?.drift_count ?? 0}</strong></div>`,
+        `<div class="row"><span>Phase counts</span><strong>${phaseCounts || "--"}</strong></div>`,
+        `<div class="row"><span>Decision counts</span><strong>${decisionCounts || "--"}</strong></div>`
       ]);
-      updateControlSurface();
-    }
-
-    function processLabel(target, process) {
-      const state = (process.state || (process.running ? "running" : "stopped")).toLowerCase();
-      if (target === "paper") {
-        if (process.running) return "Paper feed is live. Start is locked; restart only if you need a clean relaunch.";
-        if (state === "paused") return "Paper feed is paused. Start resumes the managed loop from idle.";
-        if (process.returncode != null) return `Paper feed exited with code ${process.returncode}. Start relaunches the managed loop.`;
-        return "Paper feed is idle. Start launches the managed Jupiter paper loop.";
-      }
-      if (target === "experiment-manager") {
-        if (process.running) return "Experiment manager is live. Restart recreates the message-based experiment supervisor.";
-        if (process.returncode != null) return `Experiment manager exited with code ${process.returncode}. Start relaunches it.`;
-        return "Experiment manager is idle. Start launches the message-based supervisor.";
-      }
-      if (state === "paused") return "This thread is paused. Resume continues only this experiment.";
-      if (process.running) return "This thread is running. Pause or restart only affects this experiment.";
-      if (process.returncode != null) return `This thread exited with code ${process.returncode}. Start relaunches only this experiment.`;
-      return "This thread is idle. Start launches only this experiment.";
-    }
-
-    function canUseControl(target, action, process) {
-      const state = (process.state || (process.running ? "running" : "stopped")).toLowerCase();
-      if (target === "paper") {
-        if (action === "start") return !process.running;
-        if (action === "restart") return process.running || process.returncode != null;
-        if (action === "stop") return process.running;
-      }
-      if (target === "experiment-manager") {
-        if (action === "start") return !process.running;
-        if (action === "restart") return process.running || process.returncode != null;
-        if (action === "stop") return process.running;
-      }
-      if (target === "experiment") {
-        if (action === "start") return state !== "running";
-        if (action === "pause") return state === "running";
-        if (action === "resume") return state === "paused";
-        if (action === "restart") return true;
-        if (action === "stop") return state !== "stopped";
-      }
-      return true;
-    }
-
-    function confirmControl(target, action, process) {
-      const state = (process.state || (process.running ? "running" : "stopped")).toLowerCase();
-      if (action === "restart") {
-        return window.confirm(
-          `${target === "paper" ? "Restart the paper feed" : target === "experiment-manager" ? "Restart the experiment manager" : "Restart this experiment"}? ` +
-          `This will terminate the current ${target} process and relaunch it cleanly.`
-        );
-      }
-      if (action === "stop") {
-        return window.confirm(
-          `${target === "paper" ? "Stop the paper feed" : target === "experiment-manager" ? "Stop the experiment manager" : "Stop this experiment"}? ` +
-          `This halts the managed ${target} process${state === "paused" ? " while it is paused" : ""} until you start it again.`
-        );
-      }
-      return true;
-    }
-
-    function updateControlSurface() {
-      const paper = lastWorkbench.paper || {};
-      const manager = lastWorkbench["experiment-manager"] || {};
-      const busy = controlBusy;
-      const update = (target, action, label, process) => {
-        const button = controlButtons[target]?.[action];
-        if (!button) return;
-        const enabled = workbenchReady && !busy && canUseControl(target, action, process);
-        button.disabled = !enabled;
-        button.title = enabled ? label : (workbenchReady ? processLabel(target, process) : "Waiting for workbench state...");
-      };
-      update("paper", "start", "Start the paper feed", paper);
-      update("paper", "restart", "Restart the paper feed", paper);
-      update("paper", "stop", "Stop the paper feed", paper);
-      update("experiment-manager", "start", "Start the experiment manager", manager);
-      update("experiment-manager", "restart", "Restart the experiment manager", manager);
-      update("experiment-manager", "stop", "Stop the experiment manager", manager);
-      setText("paper-control-hint", workbenchReady ? processLabel("paper", paper) : "Waiting for the first workbench snapshot...");
-      setText("manager-control-hint", workbenchReady ? processLabel("experiment-manager", manager) : "Waiting for the first workbench snapshot...");
     }
 
     async function sendControl(target, action, experimentId = null) {
-      const process = target === "experiment" ? (lastWorkbench.experiments || []).find((item) => item.id === experimentId) || {} : (lastWorkbench[target] || {});
       if (controlBusy) {
-        setText("status", "A control action is already in flight. Wait for it to settle before sending another.");
-        return;
-      }
-      if (!canUseControl(target, action, process)) {
-        setText("status", `${target} ${action} is not available in the current state.`);
-        updateControlSurface();
-        return;
-      }
-      if (!confirmControl(target, action, process)) {
-        setText("status", `${target} ${action} canceled`);
+        setText("status", "A control action is already in flight.");
         return;
       }
       controlBusy = true;
-      updateControlSurface();
-      setText("status", `Sending ${action} to ${target}...`);
+      setText("status", `Sending ${action} to ${target}${experimentId ? `:${experimentId}` : ""}...`);
       try {
         const response = await fetch("/api/workbench/control", {
           method: "POST",
@@ -682,13 +460,12 @@ uv run python workbench_ctl.py stop-manager</pre>
         if (!response.ok || !payload.ok) {
           throw new Error(payload.error || `HTTP ${response.status}`);
         }
-        setText("status", `${target} ${action} completed`);
         await refresh();
+        setText("status", `${target} ${action} completed`);
       } catch (error) {
         setText("status", `${target} ${action} failed: ${error.message}`);
       } finally {
         controlBusy = false;
-        updateControlSurface();
       }
     }
 
@@ -700,12 +477,12 @@ uv run python workbench_ctl.py stop-manager</pre>
         renderActions(payload.actions);
         renderMetrics(payload);
         renderPositions(payload);
+        renderEvents(payload.experiment_events || []);
+        renderMeta(payload.meta || {}, payload.workbench.experiment_manager || {});
         renderLeaders(payload);
-        renderRecent(payload);
-        renderResearch(payload);
-        renderMeta(payload);
         renderChart(payload);
-        renderWorkbench(payload);
+        renderExperiments(payload.experiments || []);
+        renderWorkbench(payload.workbench || {});
         setText("generated", `Last refreshed ${payload.meta.generated_at}`);
         setText("status", "Refreshing every 10 seconds");
       } catch (error) {
@@ -714,17 +491,7 @@ uv run python workbench_ctl.py stop-manager</pre>
     }
 
     refresh();
-    updateControlSurface();
     setInterval(refresh, 10000);
-
-    document.addEventListener("click", (event) => {
-      const button = event.target.closest("button[data-target][data-action]");
-      if (!button) return;
-      const target = button.dataset.target;
-      const action = button.dataset.action;
-      const experimentId = button.dataset.experimentId || null;
-      sendControl(target, action, experimentId);
-    });
   </script>
 </body>
 </html>

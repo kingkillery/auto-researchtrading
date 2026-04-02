@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -255,6 +256,58 @@ def pid_is_running(pid: int | None) -> bool:
     return True
 
 
+def terminate_pid_tree(pid: int | None) -> bool:
+    pid = safe_int(pid)
+    if pid is None or pid <= 0:
+        return False
+    if not pid_is_running(pid):
+        return True
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        deadline = time.time() + 10.0
+        while time.time() < deadline:
+            if not pid_is_running(pid):
+                return True
+            time.sleep(0.2)
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            if not pid_is_running(pid):
+                return True
+            time.sleep(0.2)
+        return not pid_is_running(pid)
+    try:
+        os.killpg(os.getpgid(pid), signal.SIGTERM)
+    except OSError:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            return not pid_is_running(pid)
+    deadline = time.time() + 10.0
+    while time.time() < deadline:
+        if not pid_is_running(pid):
+            return True
+        time.sleep(0.2)
+    try:
+        os.killpg(os.getpgid(pid), signal.SIGKILL)
+    except OSError:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            return not pid_is_running(pid)
+    return not pid_is_running(pid)
+
+
 def acquire_workbench_lock() -> None:
     global WORKBENCH_LOCK_FD
     WORKBENCH_ROOT.mkdir(parents=True, exist_ok=True)
@@ -330,52 +383,84 @@ class ManagedProcess:
         self._proc: subprocess.Popen[str] | None = None
         self._log_handle = None
         self._lock = threading.RLock()
+        self._last_pid: int | None = None
+        self._last_returncode: int | None = None
+
+    def _close_log_handle(self) -> None:
+        if self._log_handle is None:
+            return
+        self._log_handle.flush()
+        self._log_handle.close()
+        self._log_handle = None
+
+    def _reap_finished_process(self) -> None:
+        if self._proc is None or self._proc.poll() is None:
+            return
+        self._last_pid = self._proc.pid
+        self._last_returncode = self._proc.poll()
+        self._proc = None
+        self._close_log_handle()
+
+    def _terminate_process_tree(self, proc: subprocess.Popen[str]) -> None:
+        if proc.poll() is not None:
+            return
+        terminate_pid_tree(proc.pid)
+        try:
+            proc.wait(timeout=0.1)
+        except subprocess.TimeoutExpired:
+            pass
 
     def is_running(self) -> bool:
         with self._lock:
+            self._reap_finished_process()
             return self._proc is not None and self._proc.poll() is None
 
     def start(self) -> dict[str, Any]:
         with self._lock:
+            self._reap_finished_process()
             if self.is_running():
                 return self.snapshot()
             self.log_path.parent.mkdir(parents=True, exist_ok=True)
+            self._close_log_handle()
             self._log_handle = self.log_path.open("w", encoding="utf-8")
             creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
             env = os.environ.copy()
             env["PYTHONUNBUFFERED"] = "1"
-            self._proc = subprocess.Popen(
-                self.command,
-                cwd=str(self.cwd),
-                stdout=self._log_handle,
-                stderr=subprocess.STDOUT,
-                text=True,
-                creationflags=creationflags,
-                env=env,
-            )
+            popen_kwargs: dict[str, Any] = {
+                "cwd": str(self.cwd),
+                "stdout": self._log_handle,
+                "stderr": subprocess.STDOUT,
+                "text": True,
+                "env": env,
+            }
+            if os.name == "nt":
+                popen_kwargs["creationflags"] = creationflags
+            else:
+                popen_kwargs["start_new_session"] = True
+            self._proc = subprocess.Popen(self.command, **popen_kwargs)
+            self._last_pid = self._proc.pid
+            self._last_returncode = None
             return self.snapshot()
 
     def stop(self) -> dict[str, Any]:
         with self._lock:
+            self._reap_finished_process()
             if self._proc is None:
+                self._close_log_handle()
                 return self.snapshot()
-            if self._proc.poll() is None:
-                self._proc.terminate()
-                try:
-                    self._proc.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    self._proc.kill()
-                    self._proc.wait(timeout=5)
-            if self._log_handle is not None:
-                self._log_handle.flush()
-                self._log_handle.close()
-                self._log_handle = None
+            proc = self._proc
+            self._terminate_process_tree(proc)
+            self._last_pid = proc.pid
+            self._last_returncode = proc.poll()
+            self._proc = None
+            self._close_log_handle()
             return self.snapshot()
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
-            pid = self._proc.pid if self._proc is not None else None
-            returncode = self._proc.poll() if self._proc is not None else None
+            self._reap_finished_process()
+            pid = self._proc.pid if self._proc is not None else self._last_pid
+            returncode = self._proc.poll() if self._proc is not None else self._last_returncode
             return {
                 "name": self.name,
                 "pid": pid,
@@ -456,8 +541,12 @@ class WorkbenchSupervisor:
                     "active_count": 0,
                     "paused_count": 0,
                     "failed_count": 0,
+                    "degraded_count": 0,
+                    "drift_count": 0,
                     "leader_id": None,
                     "leader_score": None,
+                    "phase_counts": {},
+                    "decision_counts": {},
                 },
                 "experiments": [],
             },
@@ -487,26 +576,58 @@ class WorkbenchSupervisor:
                 experiment["restart_nonce"] = int(experiment.get("restart_nonce", 0)) + 1
         write_json(self.experiment_control_path, current)
 
+    def _status_manager_pid(self) -> int | None:
+        manager_pid = safe_int(self._experiment_status().get("pid"))
+        if manager_pid is None or not pid_is_running(manager_pid):
+            return None
+        return manager_pid
+
+    def _ensure_manager_process(self) -> None:
+        tracked_pid = safe_int(self.experiment_manager.snapshot().get("pid"))
+        manager_pid = self._status_manager_pid()
+        if manager_pid is not None and manager_pid != tracked_pid:
+            return
+        self.experiment_manager.start()
+
+    def _stop_manager_process(self) -> None:
+        tracked_pid = safe_int(self.experiment_manager.snapshot().get("pid"))
+        self.experiment_manager.stop()
+        manager_pid = self._status_manager_pid()
+        if manager_pid is not None and manager_pid != tracked_pid:
+            terminate_pid_tree(manager_pid)
+
     def start_all(self) -> None:
         with self._lock:
             self.paper.start()
             self._update_control(manager_state="running")
-            self.experiment_manager.start()
+            self._ensure_manager_process()
 
     def status(self) -> dict[str, Any]:
         with self._lock:
             manager_state = self._experiment_status()
             experiments = manager_state.get("experiments", [])
-            summary = manager_state.get("summary", {})
+            summary = dict(manager_state.get("summary", {}))
             leader = next((item for item in experiments if item.get("id") == summary.get("leader_id")), None)
+            manager_snapshot = self.experiment_manager.snapshot()
+            manager_pid = safe_int(manager_state.get("pid"))
+            manager_running = bool(manager_snapshot.get("running"))
+            if manager_pid is not None:
+                manager_running = pid_is_running(manager_pid)
+                manager_snapshot["pid"] = manager_pid
+                manager_snapshot["running"] = manager_running
+                manager_snapshot["returncode"] = None if manager_running else manager_snapshot.get("returncode")
+            manager_state_name = manager_state.get("state", "stopped")
+            if not manager_running:
+                manager_state_name = "stopped"
+                summary["manager_state"] = "stopped"
             trainer_alias = {
-                **self.experiment_manager.snapshot(),
-                "state": manager_state.get("state", "stopped"),
+                **manager_snapshot,
+                "state": manager_state_name,
                 "desired_state": summary.get("manager_state", "running"),
                 "iteration": summary.get("experiment_count", 0),
                 "mode": "message-bus",
                 "last_completed_at": leader.get("last_completed_at") if leader else None,
-                "last_metrics": leader.get("last_metrics", {}) if leader else {},
+                "last_metrics": leader.get("best_metrics", {}) if leader else {},
                 "control_path": str(self.experiment_control_path),
                 "status_path": str(self.experiment_status_path),
                 "events_path": str(self.experiment_events_path),
@@ -519,9 +640,9 @@ class WorkbenchSupervisor:
                 },
                 "paper": self.paper.snapshot(),
                 "experiment_manager": {
-                    **self.experiment_manager.snapshot(),
-                    "state": manager_state.get("state", "stopped"),
-                    "summary": manager_state.get("summary", {}),
+                    **manager_snapshot,
+                    "state": manager_state_name,
+                    "summary": summary,
                     "control_path": str(self.experiment_control_path),
                     "status_path": str(self.experiment_status_path),
                     "events_path": str(self.experiment_events_path),
@@ -545,19 +666,19 @@ class WorkbenchSupervisor:
             elif target in {"experiment-manager", "trainer"}:
                 if action == "start":
                     self._update_control(manager_state="running")
-                    self.experiment_manager.start()
+                    self._ensure_manager_process()
                 elif action == "pause":
                     self._update_control(manager_state="paused")
                 elif action == "resume":
                     self._update_control(manager_state="running")
-                    self.experiment_manager.start()
+                    self._ensure_manager_process()
                 elif action == "stop":
                     self._update_control(manager_state="stopped")
-                    self.experiment_manager.stop()
+                    self._stop_manager_process()
                 elif action == "restart":
                     self._update_control(manager_state="running")
-                    self.experiment_manager.stop()
-                    self.experiment_manager.start()
+                    self._stop_manager_process()
+                    self._ensure_manager_process()
                 else:
                     raise ValueError(f"unsupported experiment-manager action: {action}")
             elif target == "experiment":
@@ -565,17 +686,17 @@ class WorkbenchSupervisor:
                     raise ValueError("experiment_id is required for target=experiment")
                 if action == "start":
                     self._update_control(manager_state="running", experiment_id=experiment_id, experiment_state="running")
-                    self.experiment_manager.start()
+                    self._ensure_manager_process()
                 elif action == "pause":
                     self._update_control(experiment_id=experiment_id, experiment_state="paused")
                 elif action == "resume":
                     self._update_control(manager_state="running", experiment_id=experiment_id, experiment_state="running")
-                    self.experiment_manager.start()
+                    self._ensure_manager_process()
                 elif action == "stop":
                     self._update_control(experiment_id=experiment_id, experiment_state="stopped")
                 elif action == "restart":
                     self._update_control(manager_state="running", experiment_id=experiment_id, experiment_state="running", restart=True)
-                    self.experiment_manager.start()
+                    self._ensure_manager_process()
                 else:
                     raise ValueError(f"unsupported experiment action: {action}")
             else:
@@ -618,7 +739,7 @@ def dashboard_payload() -> dict[str, Any]:
     research = {
         "summary": {
             "total_runs": experiment_summary.get("experiment_count", 0),
-            "best_val_bpb": leader.get("last_metrics", {}).get("score") if leader else None,
+            "best_val_bpb": leader.get("best_score") if leader else None,
             "best_commit": experiment_summary.get("leader_id"),
         },
         "status_counts": {
