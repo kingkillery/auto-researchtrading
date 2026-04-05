@@ -5,6 +5,13 @@ Backtest-first autonomous trading research for Hyperliquid perpetual futures. Th
 
 ## Handoff Log
 
+2026-04-05T00:20:00-06:00 - Add repo copy of mirrored Obsidian integration note
+Changed: Added the vault-style integration checklist note into the repo under `docs/` so the Obsidian mirror also exists in version control.
+Files: `docs/obsidian-2026-04-05-integration-execution-checklists.md`, `kade/KADE.md`
+Why: The mirrored note was only in the external vault; this keeps the same artifact in the repo for portability and review.
+Verified: Wrote the note into `docs/` with the same frontmatter and body used in the vault copy.
+Next: If you want it tracked remotely too, commit and push this note separately so it does not get lost in local-only state.
+
 2026-04-05T00:10:00-06:00 - Clarify Jupiter knowledge vs execution layers
 Changed: Added explicit documentation that `jup-ag/agent-skills` is an agent-context layer while `@jup-ag/api` would be a separate execution-layer dependency, and tied that distinction into the Track 2 and Track 3 integration checklists.
 Files: `docs/jupiter-execution.md`, `docs/integration-status-2026-04-01.md`, `kade/KADE.md`
