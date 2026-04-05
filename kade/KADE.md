@@ -5,6 +5,13 @@ Backtest-first autonomous trading research for Hyperliquid perpetual futures. Th
 
 ## Handoff Log
 
+2026-04-05T00:40:00-06:00 - Remove extra repo mirror note
+Changed: Deleted the repo-local Obsidian pointer note so the project keeps one canonical integration checklist doc in-repo instead of carrying an extra mirror file.
+Files: `docs/obsidian-2026-04-05-integration-execution-checklists.md`, `kade/KADE.md`
+Why: The project doc is what matters; the extra repo mirror added naming clutter without adding meaningful project information.
+Verified: Confirmed the repo mirror note is gone and kept `docs/integration-status-2026-04-01.md` as the in-repo source of truth.
+Next: If desired later, rename `docs/integration-status-2026-04-01.md` to a broader project-facing name, but only if you want to change existing links and references.
+
 2026-04-05T00:20:00-06:00 - Add repo copy of mirrored Obsidian integration note
 Changed: Added the vault-style integration checklist note into the repo under `docs/` so the Obsidian mirror also exists in version control.
 Files: `docs/obsidian-2026-04-05-integration-execution-checklists.md`, `kade/KADE.md`
