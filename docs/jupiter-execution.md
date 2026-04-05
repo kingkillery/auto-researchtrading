@@ -59,6 +59,27 @@ npm install -g @jup-ag/cli
 jup --version
 ```
 
+## Jupiter Ecosystem Layers
+
+There are two distinct Jupiter-facing layers that may show up in future agent or integration work:
+
+- `jup-ag/agent-skills`
+  - knowledge layer for AI agents
+  - provides instruction/context packages such as `integrating-jupiter` and `jupiter-lend`
+  - useful for teaching an agent what Jupiter surfaces exist and how to reason about valid workflows
+  - not a runtime dependency of this repo
+- `@jup-ag/api` from `jup-ag/jupiter-quote-api-node`
+  - execution layer for JavaScript or TypeScript integrations
+  - provides the generated Jupiter API client for live HTTP quote and route calls
+  - relevant only if this repo explicitly adds a JS or TS execution path
+
+Current repo contract:
+
+- live execution remains CLI-backed through `jup`
+- operator docs may reference Jupiter skills as optional agent context
+- agent skill packages must not be treated as proof that the repo has gained a new execution dependency
+- `@jup-ag/api` should not be introduced into this repo without an explicit scope change
+
 ## Local Wallet Setup
 
 ### 1. Confirm Node/npm or a global `jup`
@@ -165,6 +186,118 @@ If you need a review surface for those requests:
 ```bash
 uv run python external_wallet_bridge.py --request-path <orders.jsonl>
 ```
+
+## External-Wallet Request Contract
+
+The external-wallet handoff is now a documented schema contract. `run_jupiter_live.py --wallet-mode external` appends one JSON object per line to `--order-request-path`.
+
+Schema version:
+
+- `schema_version: 1`
+
+Top-level fields emitted for each request:
+
+- `schema_version`
+- `request_id`
+- `timestamp`
+- `wallet_mode`
+- `wallet_address`
+- `status`
+- `approval_status`
+- `asset`
+- `action`
+- `side`
+- `current_position_usd`
+- `target_position_usd`
+- `size_delta_usd`
+- `position_pubkey`
+- `message`
+- `command_preview`
+- `operator_summary`
+- `signer_payload`
+- `handoff`
+
+`approval_status` semantics:
+
+- `pending_manual_signature` for actionable planned orders
+- `info_only` when the plan is informational and should not produce a signature request
+
+`signer_payload` fields:
+
+- `kind` = `jupiter_perps_order_request`
+- `wallet_address`
+- `asset`
+- `action`
+- `side`
+- `size_usd`
+- `current_position_usd`
+- `target_position_usd`
+- `collateral_token`
+- `collateral_amount`
+- `receive_token`
+- `leverage`
+- `slippage_bps`
+- `position_pubkey`
+- `command_preview`
+
+`handoff` fields:
+
+- `recommended_surface`
+- `board_command`
+- `checklist`
+
+Example payload shape:
+
+```json
+{
+  "schema_version": 1,
+  "request_id": "1712102400000::sol::open::long::250.000000",
+  "timestamp": 1712102400000,
+  "wallet_mode": "external",
+  "wallet_address": "<wallet>",
+  "status": "planned",
+  "approval_status": "pending_manual_signature",
+  "asset": "SOL",
+  "action": "open",
+  "side": "long",
+  "current_position_usd": 0.0,
+  "target_position_usd": 250.0,
+  "size_delta_usd": 250.0,
+  "position_pubkey": null,
+  "message": "External wallet mode cannot sign in-process...",
+  "command_preview": ["jup", "perps", "open", "..."],
+  "operator_summary": "Open a LONG SOL perp for 250.00 USD notional using about 125.00 USDC collateral at 2.00x leverage.",
+  "signer_payload": {
+    "kind": "jupiter_perps_order_request",
+    "wallet_address": "<wallet>",
+    "asset": "SOL",
+    "action": "open",
+    "side": "long",
+    "size_usd": 250.0,
+    "current_position_usd": 0.0,
+    "target_position_usd": 250.0,
+    "collateral_token": "USDC",
+    "collateral_amount": 125.0,
+    "receive_token": "USDC",
+    "leverage": 2.0,
+    "slippage_bps": 200,
+    "position_pubkey": null,
+    "command_preview": ["jup", "perps", "open", "..."]
+  },
+  "handoff": {
+    "recommended_surface": "jupiter_wallet_kit_or_browser_wallet",
+    "board_command": ["uv", "run", "python", "external_wallet_bridge.py", "--request-path", "<orders.jsonl>"],
+    "checklist": [
+      "Confirm the wallet address matches the operator's intended Jupiter wallet.",
+      "Verify the current position and target delta still make sense before signing.",
+      "Use the signer payload or command preview to recreate the order in the wallet-controlled surface.",
+      "After acting, record approve/reject/submitted status in the approval board."
+    ]
+  }
+}
+```
+
+Operator rule: do not change or extend this payload shape without updating this doc and the approval board expectations together.
 
 ## Operational Guardrails
 

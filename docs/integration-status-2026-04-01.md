@@ -1,98 +1,176 @@
-# Integration Status - 2026-04-01
+# Integration Execution Checklists - 2026-04-01
 
-This note is a PM coordination snapshot for the three approved follow-ups:
+This note is the concrete operator follow-through for the three approved integration tracks:
 
-1. 5-minute replay/backtest surface for the VWAP + EMA strategy
-2. Jupiter CLI installation/config plus local-wallet live path
-3. External-wallet signer flow
+1. Track 1: canonical 5-minute replay or backtest workflow
+2. Track 2: Jupiter CLI plus local-wallet live readiness
+3. Track 3: external-wallet signer handoff
 
-## Current State
+It replaces the earlier PM-only status snapshot with execution checklists tied to the current repo surfaces.
 
-### Track 1: 5-minute replay/backtest surface
+## Canonical Commands
 
-Status: not landed in a dedicated form yet.
+Hourly validation source of truth:
 
-What exists now:
+```bash
+uv run backtest.py
+```
 
-- `paper_trade.py` already supports historical replay via `--replay-split`.
-- `run_jupiter_live.py` already supports synthetic bar sizing via `--bar-seconds`.
+5-minute validation source of truth:
 
-What is still missing for this track to count as complete:
+```bash
+uv run python backtest_5m.py --split val --symbols SOL
+```
 
-- a clear 5-minute-specific replay/backtest entrypoint or documented workflow
-- an agreed data source for 5-minute bars
-- validation output that is comparable run to run
+Local-wallet readiness check:
 
-### Track 2: Jupiter CLI plus local-wallet live path
+```bash
+uv run python run_jupiter_live.py --validate-local-wallet-setup
+```
 
-Status: code path is present and operator-guarded, but host-level CLI installation/config still needs explicit operator verification.
+External-wallet review board:
 
-Current landing zone:
+```bash
+uv run python external_wallet_bridge.py --request-path <orders.jsonl>
+```
 
-- `jupiter_execution.py` contains the CLI-backed execution model and live-order planning
-- `run_jupiter_live.py` exposes `--execution-mode live`, `--wallet-mode local`, and the live confirmation guard
-- `docs/jupiter-execution.md` documents the local-wallet path
+## Track 1 - 5-Minute Replay / Backtest Workflow
 
-Known dependency:
+Current landing state:
 
-- the external `jup` CLI must be installed, configured, and funded outside the repo
+- The dedicated runner already exists at `backtest_5m.py`.
+- The canonical operator doc is `docs/backtest-5m.md`.
+- The current default validation command is `uv run python backtest_5m.py --split val --symbols SOL`.
 
-### Track 3: external-wallet signer flow
+Data-source contract:
 
-Status: partial landing.
+- First choice: Binance public 5-minute OHLCV
+- Fallback: Hyperliquid candle API
+- Funding overlay: Hyperliquid funding history merged into the 5-minute bars
 
-What exists now:
+Comparable output contract:
 
-- `run_jupiter_live.py --wallet-mode external` emits JSONL order requests
-- `external_wallet_bridge.py` provides a lightweight review/ack board for those requests
+- Artifact root: `artifacts/backtests_5m/<strategy>_<split>/`
+- Required artifacts:
+  - `metrics.json`
+  - `equity_curve.csv`
+  - `trade_log.csv`
 
-What is still missing for this track to count as complete:
+Execution checklist:
 
-- actual wallet signing/submission
-- a browser or frontend signer bridge tied to Jupiter Wallet Kit or equivalent
-- a stable schema contract for the emitted request payloads
+- Confirm `docs/backtest-5m.md` still matches `backtest_5m.py` flags.
+- Use `uv run python backtest_5m.py --split val --symbols SOL` as the default validation command unless the experiment explicitly needs a different symbol set.
+- Use `--refresh-data` only when the cache is stale or missing.
+- Compare runs using the emitted `metrics.json` and `equity_curve.csv`, not console output alone.
+- Keep hourly and 5-minute conclusions separate in docs so unlike-for-like results do not get merged into one narrative.
+
+Track-1 done means:
+
+- one canonical 5-minute command is documented
+- one canonical artifact location is documented
+- the data-source order is documented
+- the workflow is linked from repo operator docs
+
+## Track 2 - Jupiter CLI Plus Local-Wallet Readiness
+
+Current landing state:
+
+- The guarded live path is `uv run python run_jupiter_live.py --execution-mode live --wallet-mode local ...`.
+- The canonical operator doc is `docs/jupiter-execution.md`.
+- The repo exposes a non-destructive validator through `--validate-local-wallet-setup`.
+- Jupiter agent-skill packages are context only; the actual execution surface in this repo remains the CLI-backed `jup` path.
+
+Host-level readiness checklist:
+
+- Confirm either a global `jup` install or working `node` plus `npm` for the `npx --yes @jup-ag/cli` fallback.
+- Confirm the intended Jupiter key exists and is selectable.
+- Run `uv run python run_jupiter_live.py --validate-local-wallet-setup`.
+- Treat exit code `0` plus `ready_for_live_local_wallet: true` as the readiness gate.
+- Exercise the live order path with `--jupiter-cli-dry-run` before allowing broadcast.
+- Keep the first real live budget small and explicit with `--live-equity-budget-usd`.
+
+Non-destructive validation sequence:
+
+```bash
+node --version
+npm --version
+jup --version
+uv run python run_jupiter_live.py --validate-local-wallet-setup
+uv run python run_jupiter_live.py --execution-mode live --wallet-mode local --live-confirmation I_UNDERSTAND_JUPITER_LIVE_ORDERS --live-equity-budget-usd 250 --live-leverage 2 --jupiter-cli-dry-run
+```
+
+Track-2 done means:
+
+- the target host has passed the repo validator
+- the operator checklist matches the current CLI flags
+- dry-run exercise succeeded before any broadcast path was used
+- docs describe local-wallet signing as a separate trust boundary from external-wallet signing
+
+## Track 3 - External-Wallet Signer Handoff
+
+Current landing state:
+
+- `run_jupiter_live.py --wallet-mode external` emits JSONL requests.
+- `external_wallet_bridge.py` provides the review and decision board.
+- `docs/jupiter-execution.md` now documents the emitted schema contract.
+- Any future JS or TS client adoption, including `@jup-ag/api`, is a separate execution-layer decision and is not implied by agent-skill docs alone.
+
+Schema contract:
+
+- Request file format: JSONL
+- Schema version: `1`
+- Approval board statuses in play:
+  - `pending_manual_signature`
+  - `info_only`
+  - board decisions: `approved`, `rejected`, `submitted`, `handled`
+
+Execution checklist:
+
+- Start the runner with `--execution-mode live --wallet-mode external --wallet-address <wallet>`.
+- If needed, pin `--order-request-path` so the file location is explicit.
+- Launch the board with `uv run python external_wallet_bridge.py --request-path <orders.jsonl>`.
+- Review `signer_payload`, `operator_summary`, and `handoff.checklist` before acting.
+- Record a board decision after every operator action so the queue stays auditable.
+- Do not expand the bridge beyond manual review until the signer target surface is chosen.
+
+Implementation boundary:
+
+- The repo currently stops at request emission plus operator review.
+- Wallet signing and submission remain outside the completed repo contract.
+- Any future wallet-kit or signer bridge must preserve the documented JSONL payload or rev the schema intentionally.
+
+Track-3 done means:
+
+- the request schema is frozen in docs
+- the board command is documented
+- the trust boundary between repo planning and wallet signing is explicit
+- any future signer bridge is built against the documented payload instead of an implicit field grab
 
 ## Dependency Order
 
-Recommended merge order:
+Recommended merge order remains:
 
 1. Track 2 first
 2. Track 3 second
-3. Track 1 independently, but align its operator docs with the final live-runner contract
+3. Track 1 alongside docs alignment, with no coupling to live signing
 
-Reasoning:
+Why:
 
-- Track 3 depends on the request schema and target-position semantics coming out of `jupiter_execution.py` and `run_jupiter_live.py`.
-- If Track 2 changes plan serialization late, Track 3 will drift.
-- Track 1 is mostly independent, but any operator docs should reference the final CLI flags and bar-sizing contract already exposed by `run_jupiter_live.py`.
+- Track 2 fixes the local-wallet operator baseline.
+- Track 3 depends on the live-runner order semantics and request payload remaining stable.
+- Track 1 is mostly independent but should continue using the same terminology around paper, live, and explicit operator control.
 
-## Sequencing Risks
+## Cross-Track Risks
 
-- Schema drift: `external_wallet_bridge.py` currently renders whatever JSONL fields the live runner emits. Any rename in request payload fields can silently break the board.
-- Timeframe mismatch: the strategy idea is 5-minute-native, but the fixed harness remains backtest-first and historically oriented. A replay surface that still reads hourly data does not solve the validation gap.
-- Operator confusion: `paper_trade.py` replay, `run_jupiter_live.py --execution-mode paper`, and `run_jupiter_live.py --execution-mode live` are three different surfaces. Docs should keep them distinct.
-- Wallet trust boundary: local CLI signing and external browser-wallet signing are different security models. Do not blur them in one path.
+- Multiple validation surfaces can still drift if hourly and 5-minute runs are reported interchangeably.
+- The workbench remains dependent on `fly_entrypoint.py` as the single supervision surface.
+- Windows portability remains fragile around Unix-oriented validation paths.
+- Local-wallet signing and external-wallet signing must remain documented as separate trust boundaries.
 
-## Merge Notes
+## Source Docs
 
-- Do not rework `strategy.py` as part of integration.
-- Do not modify `prepare.py`, `backtest.py`, or `benchmarks/`.
-- Keep any new signer UI or browser bridge isolated from the CLI-backed execution core.
-- Before merging Track 3, freeze the JSONL request schema in docs and add a sample payload.
-- Before calling Track 2 complete, verify `jup` installation and a non-destructive account read such as help/version/positions on the target host.
-- Before calling Track 1 complete, publish one canonical command for 5-minute replay/backtest and one canonical output artifact.
-
-## Files Currently Relevant To Integration
-
-- `paper_trade.py`
-- `run_jupiter_live.py`
-- `jupiter_execution.py`
-- `external_wallet_bridge.py`
 - `docs/agent-harness.md`
+- `docs/backtest-5m.md`
 - `docs/jupiter-execution.md`
-
-## Follow-Up Needed
-
-- Track 1 owner: land the dedicated 5-minute workflow and document the exact command.
-- Track 2 owner: finish CLI install/config validation on the real host and capture the operator checklist.
-- Track 3 owner: replace or augment the manual board with an actual signer handoff, then lock the request schema.
+- `.planning/codebase/ARCHITECTURE.md`
+- `.planning/codebase/CONCERNS.md`
