@@ -25,6 +25,9 @@ import {
 import './App.css'
 
 type Capability = 'mission' | 'fleet' | 'risk' | 'research'
+type WorkspaceMode = 'timeline' | 'deck' | 'radar'
+type DensityMode = 'comfortable' | 'compact'
+type ContrastMode = 'soft' | 'sharp'
 type ExperimentAction = 'start' | 'pause' | 'resume' | 'restart' | 'stop'
 type ManagerAction = 'start' | 'pause' | 'resume' | 'restart' | 'stop'
 type PaperAction = 'start' | 'restart' | 'stop'
@@ -179,6 +182,11 @@ type TimelineSnapshot = {
   metricC: string
 }
 
+type WorkspaceModeMeta = {
+  label: string
+  summary: string
+}
+
 type PostmortemDriver =
   | 'model'
   | 'execution'
@@ -228,6 +236,7 @@ const capabilityOrder: Capability[] = ['mission', 'fleet', 'risk', 'research']
 const EMPTY_EXPERIMENTS: Experiment[] = []
 const EMPTY_EVENTS: ExperimentEvent[] = []
 const EMPTY_ACTIONS: NonNullable<DashboardPayload['actions']> = []
+const STORAGE_KEY = 'autotrader-mission-control-settings'
 const postmortemDrivers: Array<{ value: PostmortemDriver; label: string }> = [
   { value: 'model', label: 'Model' },
   { value: 'execution', label: 'Execution' },
@@ -235,6 +244,48 @@ const postmortemDrivers: Array<{ value: PostmortemDriver; label: string }> = [
   { value: 'sizing', label: 'Sizing' },
   { value: 'operational', label: 'Operational' },
 ]
+const workspaceModes: Record<WorkspaceMode, WorkspaceModeMeta> = {
+  timeline: {
+    label: 'Timeline',
+    summary: 'Mission changes first, controls second.',
+  },
+  deck: {
+    label: 'Deck',
+    summary: 'Balanced analytical reading across room, fleet, and context.',
+  },
+  radar: {
+    label: 'Radar',
+    summary: 'Intervention-first layout with fleet and context emphasized.',
+  },
+}
+
+function loadWorkspaceSettings(): {
+  mode: WorkspaceMode
+  density: DensityMode
+  contrast: ContrastMode
+} {
+  if (typeof window === 'undefined') {
+    return { mode: 'timeline', density: 'comfortable', contrast: 'soft' }
+  }
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) {
+      return { mode: 'timeline', density: 'comfortable', contrast: 'soft' }
+    }
+    const parsed = JSON.parse(raw) as Partial<{
+      mode: WorkspaceMode
+      density: DensityMode
+      contrast: ContrastMode
+    }>
+    return {
+      mode: parsed.mode || 'timeline',
+      density: parsed.density || 'comfortable',
+      contrast: parsed.contrast || 'soft',
+    }
+  } catch {
+    return { mode: 'timeline', density: 'comfortable', contrast: 'soft' }
+  }
+}
 
 function scoreOf(experiment: Experiment): number | null {
   if (typeof experiment.best_score === 'number') return experiment.best_score
@@ -445,6 +496,9 @@ function App() {
   const [postmortemGuardrail, setPostmortemGuardrail] = useState('')
   const [postmortemStatus, setPostmortemStatus] = useState('Capture the outcome while the room is still fresh.')
   const [postmortemSaved, setPostmortemSaved] = useState(false)
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>(() => loadWorkspaceSettings().mode)
+  const [densityMode, setDensityMode] = useState<DensityMode>(() => loadWorkspaceSettings().density)
+  const [contrastMode, setContrastMode] = useState<ContrastMode>(() => loadWorkspaceSettings().contrast)
 
   const deferredCapability = useDeferredValue(selectedCapability)
   const embedded = window.self !== window.top
@@ -629,8 +683,29 @@ function App() {
     setPostmortemSaved(false)
   }, [postmortemMarkdown])
 
+  useEffect(() => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        mode: workspaceMode,
+        density: densityMode,
+        contrast: contrastMode,
+      }),
+    )
+  }, [contrastMode, densityMode, workspaceMode])
+
   return (
-    <main className={`workspace ${embedded ? 'workspace--embedded' : ''}`}>
+    <main
+      className={[
+        'workspace',
+        embedded ? 'workspace--embedded' : '',
+        `workspace--${workspaceMode}`,
+        `workspace--${densityMode}`,
+        `workspace--contrast-${contrastMode}`,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <section className="dashboard-surface">
         <header className="panel command-rail">
           <div className="command-rail__lead">
@@ -662,6 +737,21 @@ function App() {
           </div>
 
           <div className="command-rail__actions">
+            <div className="command-group">
+              <span className="command-group__label">Workspace mode</span>
+              <div className="command-group__buttons">
+                {Object.entries(workspaceModes).map(([mode, meta]) => (
+                  <button
+                    key={mode}
+                    className={`rail-button ${workspaceMode === mode ? 'rail-button--active' : ''}`}
+                    type="button"
+                    onClick={() => setWorkspaceMode(mode as WorkspaceMode)}
+                  >
+                    {meta.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="command-group">
               <span className="command-group__label">Manager</span>
               <div className="command-group__buttons">
@@ -933,6 +1023,46 @@ function App() {
                   <span className="context-chip">Leader {summary.leader_id || '--'}</span>
                 </div>
                 <p className="context-card__detail">{capabilityCard.detail}</p>
+                <div className="context-rows">
+                  <div className="context-row">
+                    <span>View mode</span>
+                    <strong>{workspaceModes[workspaceMode].label}</strong>
+                  </div>
+                  <div className="context-row">
+                    <span>Density</span>
+                    <strong>{densityMode}</strong>
+                  </div>
+                  <div className="context-row">
+                    <span>Contrast</span>
+                    <strong>{contrastMode}</strong>
+                  </div>
+                </div>
+                <div className="mini-actions mini-actions--stack">
+                  <div className="segmented-control" role="group" aria-label="Density">
+                    {(['comfortable', 'compact'] as DensityMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        className={`thread-action thread-action--compact ${densityMode === mode ? 'thread-action--active' : ''}`}
+                        type="button"
+                        onClick={() => setDensityMode(mode)}
+                      >
+                        {mode === 'comfortable' ? 'Comfortable' : 'Compact'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="segmented-control" role="group" aria-label="Contrast">
+                    {(['soft', 'sharp'] as ContrastMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        className={`thread-action thread-action--compact ${contrastMode === mode ? 'thread-action--active' : ''}`}
+                        type="button"
+                        onClick={() => setContrastMode(mode)}
+                      >
+                        {mode === 'soft' ? 'Soft lines' : 'Sharp lines'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="mini-actions">
                   <button
                     className="thread-action thread-action--compact"
