@@ -31,6 +31,8 @@ This repo is a backtest-first trading research harness. The goal for agents is t
 - `uv run python workbench_ctl.py status|start-paper|stop-paper|restart-paper|start-manager|restart-manager|stop-manager|list-experiments` controls the managed workbench processes from the CLI.
 - `uv run python run_jupiter_live.py --validate-local-wallet-setup` checks whether the local-wallet Jupiter path is ready on the current machine.
 - `uv run python run_jupiter_live.py --execution-mode live ...` runs the guarded Jupiter execution path. Read `docs/jupiter-execution.md` before using it.
+- `node tools/jupiter-lend-advanced/repay_with_collateral_max_withdraw.mjs --preview` builds the advanced Jupiter Lend borrow-close plan without signing. Read `docs/jupiter-execution.md` before using it.
+- `node tools/jupiter-perps-loans/jlp_loan_cashout.mjs --preview` previews the public Perps JLP loan cashout flow without signing. Read `docs/jupiter-execution.md` before using it.
 
 There is still no always-on in-repo deployment target. The Jupiter live runner is an operator-invoked process, not a resident trading daemon.
 
@@ -40,6 +42,10 @@ There is still no always-on in-repo deployment target. The Jupiter live runner i
 - `uv` is the preferred runner.
 - No API keys are required for the current backtest/data-prep flow.
 - Jupiter live execution depends on the external `jup` CLI and its wallet/key configuration.
+- The advanced borrow helper under `tools/jupiter-lend-advanced/` uses isolated Node dependencies and a direct Solana keypair path rather than Jupiter CLI key management.
+- The Perps JLP loan helper under `tools/jupiter-perps-loans/` uses the public Perps REST API plus a direct Solana keypair path rather than the repo's perps runner or Jupiter CLI key management.
+- Fly workbench auth uses `WORKBENCH_AUTH_REQUIRED`, `WORKBENCH_AUTH_SESSION_SECRET`, and `WORKBENCH_AUTH_USERS_JSON`.
+- A Fly deployment must set `WORKBENCH_AUTH_SESSION_SECRET` and `WORKBENCH_AUTH_USERS_JSON` as secrets before launch because `fly.toml` enables auth.
 - Historical data is cached at `~/.cache/autotrader/data/`.
 - `results.tsv` is expected at the repo root when generating charts.
 - Network access is required for `prepare.py` the first time data is fetched.
@@ -51,6 +57,9 @@ There is still no always-on in-repo deployment target. The Jupiter live runner i
 - For strategy changes, run `uv run backtest.py` and compare the score to baseline.
 - For intraday strategy validation, run `uv run python backtest_5m.py --split val --symbols SOL` and inspect `metrics.json`, `equity_curve.csv`, and `trade_log.csv` in the run artifact directory.
 - For broader strategy changes, run `uv run run_benchmarks.py` as a second check.
+- For Fly workbench packaging changes, run `uv run python -m unittest tests.test_fly_docker_contract`.
+- For Fly auth changes, run `uv run python -m unittest tests.test_fly_auth`.
+- For Fly workbench packaging changes, update `docs/fly-runtime-manifest.json` in the same change whenever runtime files, runtime directories, or repo-local managed scripts change.
 - If a doc references a path or command, verify it exists in the repo before shipping.
 
 ## Known Constraints

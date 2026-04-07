@@ -1,0 +1,426 @@
+{
+  "title": "Auto-Research-Trading Codebase Knowledge Graph",
+  "last_updated": "2026-04-06",
+  "description": "Machine-readable network map of the Auto-Research-Trading repository showing major modules, runtime surfaces, capabilities, and key relationships.",
+  "nodes": [
+    {
+      "id": "research-harness",
+      "label": "Research Harness",
+      "type": "project",
+      "description": "The fixed historical-data and backtest engine centered on prepare.py and backtest.py. It defines the canonical scoring path and core shared dataclasses for the repo.",
+      "anchors": [
+        "prepare.py",
+        "backtest.py",
+        "run_benchmarks.py"
+      ],
+      "capabilities": [
+        "historical-data-download",
+        "cache-layout",
+        "backtest-engine",
+        "score-calculation"
+      ]
+    },
+    {
+      "id": "strategy-surface",
+      "label": "Strategy Surface",
+      "type": "technology",
+      "description": "The mutable strategy.py seam where trading logic is changed. It consumes shared market and portfolio dataclasses and emits target-position signals.",
+      "anchors": [
+        "strategy.py"
+      ],
+      "capabilities": [
+        "signal-generation",
+        "target-position-logic",
+        "lightweight-state-persistence"
+      ]
+    },
+    {
+      "id": "intraday-validation",
+      "label": "Intraday Validation",
+      "type": "project",
+      "description": "The 5-minute validation and replay-oriented path centered on backtest_5m.py. It evaluates faster bar data and writes richer artifacts for tactical strategy review.",
+      "anchors": [
+        "backtest_5m.py"
+      ],
+      "capabilities": [
+        "five-minute-backtests",
+        "artifact-emission",
+        "binance-hyperliquid-data-fallback"
+      ]
+    },
+    {
+      "id": "benchmark-suite",
+      "label": "Benchmark Suite",
+      "type": "project",
+      "description": "The fixed set of reference strategies in benchmarks/ executed by run_benchmarks.py. It provides comparison baselines against the mutable strategy.",
+      "anchors": [
+        "benchmarks/avellaneda_mm.py",
+        "benchmarks/funding_arb.py",
+        "benchmarks/mean_reversion.py",
+        "benchmarks/momentum_breakout.py",
+        "benchmarks/regime_mm.py",
+        "run_benchmarks.py"
+      ],
+      "capabilities": [
+        "baseline-comparison",
+        "reference-strategy-evaluation"
+      ]
+    },
+    {
+      "id": "paper-engine",
+      "label": "Paper Engine",
+      "type": "technology",
+      "description": "The simulated execution and persistence layer formed by paper_engine.py, paper_trade.py, and paper_state.py. It reuses the strategy contract for replay and paper operation.",
+      "anchors": [
+        "paper_engine.py",
+        "paper_trade.py",
+        "paper_state.py"
+      ],
+      "capabilities": [
+        "simulated-fills",
+        "portfolio-transitions",
+        "replay-trading",
+        "json-state-persistence"
+      ]
+    },
+    {
+      "id": "jupiter-live-runner",
+      "label": "Jupiter Live Runner",
+      "type": "project",
+      "description": "The orchestration entrypoint in run_jupiter_live.py for paper mode and guarded live mode. It bridges strategy target positions into Jupiter-facing execution flows.",
+      "anchors": [
+        "run_jupiter_live.py"
+      ],
+      "capabilities": [
+        "paper-mode-runner",
+        "guarded-live-mode",
+        "external-wallet-handoff",
+        "wallet-readiness-validation"
+      ]
+    },
+    {
+      "id": "jupiter-execution-adapter",
+      "label": "Jupiter Execution Adapter",
+      "type": "technology",
+      "description": "The jupiter_execution.py translation layer that converts repo target deltas into Jupiter CLI-backed order plans. It is the privileged execution backend for local-wallet live mode.",
+      "anchors": [
+        "jupiter_execution.py"
+      ],
+      "capabilities": [
+        "target-delta-translation",
+        "cli-plan-construction",
+        "live-order-orchestration"
+      ]
+    },
+    {
+      "id": "jupiter-market-data-adapter",
+      "label": "Jupiter Market Data Adapter",
+      "type": "technology",
+      "description": "The jupiter_live_adapter.py module that polls public Jupiter data and synthesizes bars. It feeds live or paper trading loops with market snapshots.",
+      "anchors": [
+        "jupiter_live_adapter.py"
+      ],
+      "capabilities": [
+        "market-polling",
+        "asset-resolution",
+        "bar-synthesis"
+      ]
+    },
+    {
+      "id": "workbench-server",
+      "label": "Workbench Server",
+      "type": "project",
+      "description": "The local operator dashboard in fly_entrypoint.py. It exposes a small HTTP control plane and supervises managed subprocesses for paper feed and experiment orchestration.",
+      "anchors": [
+        "fly_entrypoint.py",
+        "dashboard_template.html",
+        "artifacts/dashboard-generative-ui/bundle.html"
+      ],
+      "capabilities": [
+        "http-dashboard",
+        "subprocess-supervision",
+        "api-dashboard-payload",
+        "control-plane"
+      ]
+    },
+    {
+      "id": "workbench-cli",
+      "label": "Workbench CLI",
+      "type": "technology",
+      "description": "The workbench_ctl.py client that calls the local dashboard API. It is a control surface for status inspection and supervised process actions.",
+      "anchors": [
+        "workbench_ctl.py"
+      ],
+      "capabilities": [
+        "dashboard-status",
+        "process-control",
+        "experiment-control"
+      ]
+    },
+    {
+      "id": "workbench-auth",
+      "label": "Workbench Auth",
+      "type": "technology",
+      "description": "The workbench_auth.py helper and auth-related fly_entrypoint integration. It implements signed-cookie login for the local or Fly-hosted workbench surface.",
+      "anchors": [
+        "workbench_auth.py"
+      ],
+      "capabilities": [
+        "password-hash-checking",
+        "session-cookie-signing",
+        "route-protection",
+        "login-logout-flow"
+      ]
+    },
+    {
+      "id": "experiment-manager",
+      "label": "Experiment Manager",
+      "type": "project",
+      "description": "The continuous validation and experiment cycling surface in experiment_manager.py and related artifacts. It manages experiment states, iteration output, and candidate evaluation.",
+      "anchors": [
+        "experiment_manager.py",
+        "autoresearch_daemon.py",
+        "docs/experiment-manager.md"
+      ],
+      "capabilities": [
+        "thread-supervision",
+        "candidate-evaluation",
+        "event-logging",
+        "status-snapshots",
+        "cycle-recording"
+      ]
+    },
+    {
+      "id": "external-wallet-bridge",
+      "label": "External Wallet Bridge",
+      "type": "technology",
+      "description": "The external_wallet_bridge.py review surface for JSONL order handoff files. It keeps signing outside the repo process while preserving a review trail.",
+      "anchors": [
+        "external_wallet_bridge.py"
+      ],
+      "capabilities": [
+        "jsonl-handoff-review",
+        "manual-signing-workflow",
+        "approval-state-tracking"
+      ]
+    },
+    {
+      "id": "reporting-and-exports",
+      "label": "Reporting and Exports",
+      "type": "project",
+      "description": "The export and reporting utilities such as export_equity.py, export_milestones.py, and generate_charts.py. They turn backtest and experiment outputs into CSV and chart artifacts.",
+      "anchors": [
+        "export_equity.py",
+        "export_milestones.py",
+        "generate_charts.py",
+        "charts/",
+        "artifacts/"
+      ],
+      "capabilities": [
+        "equity-export",
+        "milestone-export",
+        "chart-generation",
+        "artifact-packaging"
+      ]
+    },
+    {
+      "id": "state-and-artifacts",
+      "label": "State and Artifacts",
+      "type": "project",
+      "description": "The filesystem state under ~/.cache/autotrader and repo artifacts/ outputs. It stores caches, workbench status, paper state, JSONL handoffs, and generated validation results.",
+      "anchors": [
+        "~/.cache/autotrader/data",
+        "~/.cache/autotrader/workbench",
+        "~/.cache/autotrader/live",
+        "artifacts/",
+        "results.tsv",
+        "equity_curve.csv"
+      ],
+      "capabilities": [
+        "historical-cache",
+        "workbench-state",
+        "live-state",
+        "artifact-storage"
+      ]
+    },
+    {
+      "id": "docs-surface",
+      "label": "Docs Surface",
+      "type": "project",
+      "description": "The docs/ guidance layer containing execution rules, backtest guidance, governance specs, and agent harness instructions. It defines many repo operating contracts.",
+      "anchors": [
+        "docs/agent-harness.md",
+        "docs/backtest-5m.md",
+        "docs/jupiter-execution.md",
+        "docs/jupiter-perps-mcp-governance-spec.md",
+        "docs/fly-runtime-manifest.json",
+        ".planning/codebase/"
+      ],
+      "capabilities": [
+        "operator-guidance",
+        "execution-governance",
+        "packaging-contracts",
+        "agent-harness-rules"
+      ]
+    },
+    {
+      "id": "agent-skills",
+      "label": "Agent Skills",
+      "type": "project",
+      "description": "The repo-local .agents skill surfaces, including art-auto-research and g-kade. They guide how agents interpret and operate the repo’s workflows.",
+      "anchors": [
+        ".agents/skills/art-auto-research",
+        ".agents/skills/g-kade",
+        "AGENTS.md",
+        "kade/AGENTS.md"
+      ],
+      "capabilities": [
+        "repo-skill-routing",
+        "operator-briefing",
+        "agent-guidance-overlays"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "research-harness-to-strategy-surface",
+      "source": "research-harness",
+      "target": "strategy-surface",
+      "relationship": "depends_on",
+      "description": "Research Harness depends on Strategy Surface because the backtest runners load strategy.py as the main experimentation seam."
+    },
+    {
+      "id": "research-harness-to-benchmark-suite",
+      "source": "research-harness",
+      "target": "benchmark-suite",
+      "relationship": "compares_against",
+      "description": "Research Harness compares against Benchmark Suite so the mutable strategy can be evaluated against fixed baselines."
+    },
+    {
+      "id": "research-harness-to-intraday-validation",
+      "source": "research-harness",
+      "target": "intraday-validation",
+      "relationship": "shares_contract_with",
+      "description": "Research Harness shares dataclass and scoring semantics with Intraday Validation while changing time resolution and artifact detail."
+    },
+    {
+      "id": "strategy-surface-to-paper-engine",
+      "source": "strategy-surface",
+      "target": "paper-engine",
+      "relationship": "feeds",
+      "description": "Strategy Surface feeds Paper Engine because replay and paper loops call Strategy.on_bar and use its target-position output."
+    },
+    {
+      "id": "strategy-surface-to-jupiter-live-runner",
+      "source": "strategy-surface",
+      "target": "jupiter-live-runner",
+      "relationship": "feeds",
+      "description": "Strategy Surface feeds Jupiter Live Runner because even live-capable orchestration still begins from repo-native strategy signals."
+    },
+    {
+      "id": "jupiter-live-runner-to-jupiter-market-data-adapter",
+      "source": "jupiter-live-runner",
+      "target": "jupiter-market-data-adapter",
+      "relationship": "depends_on",
+      "description": "Jupiter Live Runner depends on Jupiter Market Data Adapter for public market snapshots and bar synthesis."
+    },
+    {
+      "id": "jupiter-live-runner-to-jupiter-execution-adapter",
+      "source": "jupiter-live-runner",
+      "target": "jupiter-execution-adapter",
+      "relationship": "depends_on",
+      "description": "Jupiter Live Runner depends on Jupiter Execution Adapter when translating target deltas into live execution plans."
+    },
+    {
+      "id": "jupiter-execution-adapter-to-external-wallet-bridge",
+      "source": "jupiter-execution-adapter",
+      "target": "external-wallet-bridge",
+      "relationship": "emits_handoff_to",
+      "description": "Jupiter Execution Adapter emits JSONL order requests to External Wallet Bridge in external-wallet mode."
+    },
+    {
+      "id": "workbench-server-to-paper-engine",
+      "source": "workbench-server",
+      "target": "paper-engine",
+      "relationship": "reads_and_supervises",
+      "description": "Workbench Server reads persisted paper state and supervises the paper-feed subprocess."
+    },
+    {
+      "id": "workbench-server-to-jupiter-live-runner",
+      "source": "workbench-server",
+      "target": "jupiter-live-runner",
+      "relationship": "supervises",
+      "description": "Workbench Server launches the Jupiter Live Runner as the managed paper-feed process."
+    },
+    {
+      "id": "workbench-server-to-experiment-manager",
+      "source": "workbench-server",
+      "target": "experiment-manager",
+      "relationship": "supervises",
+      "description": "Workbench Server launches and controls Experiment Manager as a managed subprocess."
+    },
+    {
+      "id": "workbench-cli-to-workbench-server",
+      "source": "workbench-cli",
+      "target": "workbench-server",
+      "relationship": "calls_api_of",
+      "description": "Workbench CLI calls the Workbench Server HTTP API for status and control actions."
+    },
+    {
+      "id": "workbench-server-to-workbench-auth",
+      "source": "workbench-server",
+      "target": "workbench-auth",
+      "relationship": "protects_with",
+      "description": "Workbench Server protects dashboard routes with Workbench Auth while leaving health checks available."
+    },
+    {
+      "id": "paper-engine-to-state-and-artifacts",
+      "source": "paper-engine",
+      "target": "state-and-artifacts",
+      "relationship": "persists_to",
+      "description": "Paper Engine persists state into cache-backed JSON files and reads from them across sessions."
+    },
+    {
+      "id": "experiment-manager-to-state-and-artifacts",
+      "source": "experiment-manager",
+      "target": "state-and-artifacts",
+      "relationship": "persists_to",
+      "description": "Experiment Manager writes control, status, event, and cycle artifacts into workbench cache and repo artifact paths."
+    },
+    {
+      "id": "reporting-and-exports-to-state-and-artifacts",
+      "source": "reporting-and-exports",
+      "target": "state-and-artifacts",
+      "relationship": "reads_from",
+      "description": "Reporting and Exports read result tables and generated run artifacts to produce CSV and chart outputs."
+    },
+    {
+      "id": "docs-surface-to-research-harness",
+      "source": "docs-surface",
+      "target": "research-harness",
+      "relationship": "documents",
+      "description": "Docs Surface documents the harness rules, commands, and validation expectations used by the research workflow."
+    },
+    {
+      "id": "docs-surface-to-jupiter-live-runner",
+      "source": "docs-surface",
+      "target": "jupiter-live-runner",
+      "relationship": "governs",
+      "description": "Docs Surface governs how paper, live, and external-wallet Jupiter flows are supposed to be used."
+    },
+    {
+      "id": "agent-skills-to-docs-surface",
+      "source": "agent-skills",
+      "target": "docs-surface",
+      "relationship": "consumes",
+      "description": "Agent Skills consume and reinforce the repo guidance and execution contracts written in docs."
+    },
+    {
+      "id": "agent-skills-to-workbench-server",
+      "source": "agent-skills",
+      "target": "workbench-server",
+      "relationship": "operates",
+      "description": "Agent Skills provide operator-oriented guidance for controlling the dashboard and its supervised processes."
+    }
+  ]
+}

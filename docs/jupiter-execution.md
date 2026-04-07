@@ -80,6 +80,99 @@ Current repo contract:
 - agent skill packages must not be treated as proof that the repo has gained a new execution dependency
 - `@jup-ag/api` should not be introduced into this repo without an explicit scope change
 
+## Advanced Borrow Helper
+
+The repo now includes an isolated advanced helper for Jupiter Lend borrow vault closes:
+
+- path: `tools/jupiter-lend-advanced/`
+- entrypoint: `node tools/jupiter-lend-advanced/repay_with_collateral_max_withdraw.mjs`
+- purpose: implement the official `Repay with Collateral and Max Withdraw` flow using:
+  - `@jup-ag/lend-read`
+  - `@jup-ag/lend/flashloan`
+  - `@jup-ag/lend/borrow`
+  - Jupiter Lite API quote and swap-instructions
+
+Trust boundary:
+
+- this helper is separate from `run_jupiter_live.py`
+- it targets borrow vault unwind / close flows, not perps
+- it defaults to `--preview`
+- it only broadcasts when `--send` and a matching Solana keypair path are provided
+- it currently targets Jupiter Lend borrow vaults discovered through `@jup-ag/lend-read`, not the separate public Perps/JLP loan surface behind `perps-api.jup.ag/v1/loans/*`
+
+## Perps JLP Loan Helper
+
+The repo now also includes a dedicated helper for the public Jupiter Perps JLP loan surface:
+
+- path: `tools/jupiter-perps-loans/`
+- entrypoint: `node tools/jupiter-perps-loans/jlp_loan_cashout.mjs`
+- purpose: preview and, when the upstream endpoint allows it, execute the sequence:
+  - inspect live JLP loan state
+  - sweep loose wallet `JLP` toward `USDC`
+  - repay toward the JLP loan
+  - withdraw the maximum JLP allowed by the official backend
+
+Trust boundary:
+
+- this helper is separate from `run_jupiter_live.py`
+- it uses the official public Perps API under `https://perps-api.jup.ag/v1`
+- it probes `POST /loans/repay-withdraw` before any mutation
+- it refuses to send transactions when the official repay endpoint rejects the live position
+
+Install:
+
+```powershell
+npm --prefix tools/jupiter-perps-loans install
+```
+
+Preview:
+
+```powershell
+node tools/jupiter-perps-loans/jlp_loan_cashout.mjs --preview
+```
+
+Broadcast only with an explicit keypair:
+
+```powershell
+node tools/jupiter-perps-loans/jlp_loan_cashout.mjs `
+  --send `
+  --keypair-path C:\path\to\solana-keypair.json
+```
+
+Operational note:
+
+- the helper treats the official Perps API as the source of truth for current loan state
+- it will not mutate unless the current preview sees an open position and the official `POST /loans/repay-withdraw` probe succeeds for the derived action
+
+Install the helper dependencies:
+
+```powershell
+npm --prefix tools/jupiter-lend-advanced install
+```
+
+Preview the close path using the wallet in repo `.env`:
+
+```powershell
+node tools/jupiter-lend-advanced/repay_with_collateral_max_withdraw.mjs --preview
+```
+
+Preview while also sweeping any loose wallet JLP into the swap leg:
+
+```powershell
+node tools/jupiter-lend-advanced/repay_with_collateral_max_withdraw.mjs `
+  --preview `
+  --include-wallet-collateral
+```
+
+Broadcast only with an explicit keypair:
+
+```powershell
+node tools/jupiter-lend-advanced/repay_with_collateral_max_withdraw.mjs `
+  --send `
+  --keypair-path C:\path\to\solana-keypair.json `
+  --include-wallet-collateral
+```
+
 ## Local Wallet Setup
 
 ### 1. Confirm Node/npm or a global `jup`

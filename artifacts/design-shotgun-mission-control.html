@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Auto-Research Mission Control Variants</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08111d;
+      --panel: rgba(10, 20, 34, 0.92);
+      --panel-soft: rgba(255,255,255,0.04);
+      --line: rgba(144, 165, 191, 0.18);
+      --text: #edf4fb;
+      --muted: #9bb0c8;
+      --accent: #52e0b2;
+      --warn: #d8b45f;
+      --danger: #ff7b72;
+      --shadow: 0 26px 70px rgba(0,0,0,0.32);
+      font-family: "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(82,224,178,0.12), transparent 25%),
+        radial-gradient(circle at bottom right, rgba(216,180,95,0.08), transparent 28%),
+        linear-gradient(180deg, #07111c, var(--bg));
+      color: var(--text);
+    }
+    .shell { width: min(1800px, calc(100% - 28px)); margin: 0 auto; padding: 22px 0 30px; }
+    .hero, .variant {
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent 18%), var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: .16em;
+      color: var(--warn);
+      font-size: 11px;
+      margin: 0;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1; font-family: "Aptos Display","Segoe UI Variable Display","Segoe UI",sans-serif; }
+    h1 { font-size: clamp(2rem, 3vw, 3.4rem); letter-spacing: -.05em; }
+    .lede, .meta, .note, .chip, .variant p { color: var(--muted); line-height: 1.6; }
+    .board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .variant { padding: 18px; display: grid; gap: 14px; min-height: 920px; }
+    .variant-header { display: flex; justify-content: space-between; gap: 14px; align-items: baseline; }
+    .badge {
+      border-radius: 999px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-size: 12px;
+    }
+    .stage {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(255,255,255,0.03);
+      overflow: hidden;
+      min-height: 650px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .screen-a, .screen-b, .screen-c { padding: 14px; display: grid; gap: 14px; min-height: 604px; }
+    .screen-a {
+      grid-template-columns: 280px 1fr 320px;
+      background:
+        radial-gradient(circle at top right, rgba(82,224,178,0.12), transparent 22%),
+        linear-gradient(180deg, rgba(10,20,34,0.95), rgba(7,15,25,0.92));
+    }
+    .screen-b {
+      grid-template-columns: 1fr;
+      background:
+        radial-gradient(circle at top center, rgba(216,180,95,0.08), transparent 18%),
+        linear-gradient(180deg, rgba(8,16,27,0.96), rgba(6,12,20,0.92));
+    }
+    .screen-c {
+      grid-template-columns: 220px 1fr;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.02), transparent 26%),
+        linear-gradient(180deg, rgba(8,16,27,0.96), rgba(6,12,20,0.92));
+    }
+    .nav, .panel, .rail {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(255,255,255,0.03);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .panel-grid { display: grid; gap: 12px; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border-radius: 999px;
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.035);
+      font-size: 12px;
+    }
+    .kpi-row { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+    .kpi {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.03);
+      padding: 12px;
+    }
+    .kpi strong { display: block; font-size: 1.35rem; margin-top: 6px; }
+    .timeline-item, .thread, .prompt, .context-block {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.028);
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+    }
+    .timeline-item strong, .thread strong, .context-block strong, .prompt strong { font-size: .98rem; }
+    .thread-grid { display: grid; gap: 10px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+    }
+    .button.primary { border-color: rgba(82,224,178,0.34); background: rgba(82,224,178,0.12); }
+    .button.warn { border-color: rgba(216,180,95,0.34); background: rgba(216,180,95,0.10); }
+    .button.danger { border-color: rgba(255,123,114,0.34); background: rgba(255,123,114,0.10); }
+    .mission-ribbon {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.03);
+      padding: 12px 14px;
+    }
+    .timeline-chat { display: grid; gap: 10px; }
+    .bubble {
+      border-radius: 20px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.035);
+    }
+    .bubble.system { background: linear-gradient(180deg, rgba(82,224,178,0.12), rgba(255,255,255,0.03)); }
+    .bubble.operator { background: linear-gradient(180deg, rgba(216,180,95,0.12), rgba(255,255,255,0.03)); }
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--warn); margin-bottom: 8px; }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .column-stack { display: grid; gap: 12px; }
+    .notes { display: grid; gap: 8px; }
+    ul { margin: 0; padding-left: 18px; color: var(--muted); }
+    @media (max-width: 1400px) {
+      .board { grid-template-columns: 1fr; }
+      .variant { min-height: auto; }
+      .screen-a, .screen-c { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <p class="eyebrow">Design Shotgun Fallback</p>
+      <h1>Three calm mission-control directions for Auto-Research.</h1>
+      <p class="lede">
+        The native design binary is unavailable here, so this comparison board uses repo-grounded HTML mockups.
+        All three variants honor the same backend contract and operator goals, but they differ in how strongly they center timeline, fleet control, and execution context.
+      </p>
+      <div class="footer">
+        <span>Shared read model: <code>/api/dashboard</code></span>
+        <span>Shared action model: <code>/api/workbench/control</code></span>
+        <span>Design tone: calm, analytical, non-flashy</span>
+      </div>
+    </section>
+
+    <section class="board">
+      <article class="variant">
+        <div class="variant-header">
+          <div>
+            <p class="eyebrow">Variant A</p>
+            <h2>Mission Timeline First</h2>
+          </div>
+          <span class="badge">Best for situational awareness</span>
+        </div>
+        <p>The primary surface is a chat-like mission timeline. Actions feel deliberate, and the operator always understands what changed before they intervene.</p>
+        <div class="stage">
+          <div class="topbar">
+            <span>MODE mission</span><span>AUTH prest</span><span>PAPER $100,026</span><span>LEADER perps-trend-follow</span><span>A/D/F 7/1/0</span>
+          </div>
+          <div class="screen-a">
+            <div class="nav">
+              <strong>Capabilities</strong>
+              <div class="chip-row">
+                <span class="chip">Mission</span><span class="chip">Threads</span><span class="chip">Research</span>
+                <span class="chip">Execution</span><span class="chip">Wallet</span><span class="chip">Reports</span>
+              </div>
+              <div class="thread-grid">
+                <div class="thread"><strong>perps-trend-follow</strong><span class="meta">running · score 20.63 · focused</span></div>
+                <div class="thread"><strong>perps-regime-switch</strong><span class="meta">paused · score 14.88</span></div>
+                <div class="thread"><strong>perps-failure-reversal</strong><span class="meta">degraded · verifier miss</span></div>
+              </div>
+            </div>
+            <div class="column-stack">
+              <div class="mission-ribbon">
+                <strong>The room has one weak thread and one clear next move.</strong>
+                <div class="actions"><span class="button primary">Restart weakest thread</span><span class="button">Open wallet review</span></div>
+              </div>
+              <div class="timeline-chat">
+                <div class="bubble system"><div class="label">System</div><strong>Leader is stable at 20.63.</strong><div class="meta">The manager is running, paper feed is healthy, and one thread is degraded after a verifier rejection.</div></div>
+                <div class="bubble operator"><div class="label">Operator</div><strong>What changed in the last cycle?</strong><div class="meta">Show only what needs attention and the verification step for the next action.</div></div>
+                <div class="timeline-item"><strong>candidate_verified</strong><div class="meta">perps-regime-switch · verifying_candidate · failed gate: drawdown drift</div></div>
+                <div class="timeline-item"><strong>candidate_decided</strong><div class="meta">perps-trend-follow · promoted · score 20.63</div></div>
+                <div class="timeline-item"><strong>paper position flipped</strong><div class="meta">SOL short closed, flat again, verify with workbench status</div></div>
+              </div>
+            </div>
+            <div class="rail">
+              <div class="context-block"><strong>Selected thread</strong><span class="meta">perps-failure-reversal · degraded · search space failure_reversal</span><div class="actions"><span class="button warn">Pause</span><span class="button primary">Restart</span><span class="button danger">Stop</span></div></div>
+              <div class="context-block"><strong>Paper engine</strong><span class="meta">running · 2 open exposures · return +0.9%</span></div>
+              <div class="context-block"><strong>Trade postmortem</strong><span class="meta">Open modal to record the latest outcome, classify the driver, and copy the markdown draft.</span><span class="button">Open postmortem</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="notes">
+          <strong>Why it works</strong>
+          <ul>
+            <li>The timeline becomes the product.</li>
+            <li>Great when the operator wants “what changed?” first.</li>
+            <li>Best fit for the new chat-first direction.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="variant">
+        <div class="variant-header">
+          <div>
+            <p class="eyebrow">Variant B</p>
+            <h2>Analytical Deck</h2>
+          </div>
+          <span class="badge">Best for score and room comparison</span>
+        </div>
+        <p>The top layer is a calmer analytical deck. It still uses chat for prompts, but the emphasis is on scoreboards, room geometry, and comparative reading before intervention.</p>
+        <div class="stage">
+          <div class="topbar">
+            <span>MODE research</span><span>AUTH prest</span><span>RUNS 10</span><span>BEST SCORE 20.63</span><span>DEGRADED 1</span>
+          </div>
+          <div class="screen-b">
+            <div class="kpi-row">
+              <div class="kpi"><span>Leader</span><strong>trend-follow</strong></div>
+              <div class="kpi"><span>Median score</span><strong>14.88</strong></div>
+              <div class="kpi"><span>Paper equity</span><strong>$100,026</strong></div>
+            </div>
+            <div class="panel-grid" style="grid-template-columns: 1.2fr .8fr; display:grid;">
+              <div class="panel-grid">
+                <div class="panel">
+                  <p class="eyebrow">Room geometry</p>
+                  <h3>Phase distribution</h3>
+                  <div class="chip-row">
+                    <span class="chip">running: 7</span><span class="chip">paused: 2</span><span class="chip">degraded: 1</span>
+                  </div>
+                </div>
+                <div class="panel">
+                  <p class="eyebrow">Leaderboard</p>
+                  <h3>Search space comparison</h3>
+                  <div class="thread-grid">
+                    <div class="thread"><strong>trend_following</strong><span class="meta">20.63 · promoted</span></div>
+                    <div class="thread"><strong>regime_switching</strong><span class="meta">14.88 · paused after drift</span></div>
+                    <div class="thread"><strong>compression_breakout</strong><span class="meta">13.41 · active</span></div>
+                  </div>
+                </div>
+                <div class="panel">
+                  <p class="eyebrow">Narrative prompts</p>
+                  <div class="bubble system"><div class="label">System</div><strong>The room is healthy enough to compare, not just react.</strong><div class="meta">Use the right rail for action if a thread drops below the current median by more than one regime.</div></div>
+                </div>
+              </div>
+              <div class="panel-grid">
+                <div class="panel">
+                  <p class="eyebrow">Interventions</p>
+                  <div class="actions"><span class="button primary">Compare leader vs challenger</span><span class="button warn">Pause weak thread</span></div>
+                </div>
+                <div class="panel">
+                  <p class="eyebrow">Execution</p>
+                  <div class="context-block"><strong>Validator</strong><span class="meta">ready</span></div>
+                  <div class="context-block"><strong>Wallet path</strong><span class="meta">external handoff idle</span></div>
+                </div>
+                <div class="panel">
+                  <p class="eyebrow">Postmortem</p>
+                  <span class="meta">A calmer side-sheet style instead of a full-screen modal.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="notes">
+          <strong>Why it works</strong>
+          <ul>
+            <li>Feels closest to BitMEX/Bybit analytical density without hype.</li>
+            <li>Best if the operator compares threads more than they act.</li>
+            <li>Less chat-dominant, more deck-like.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="variant">
+        <div class="variant-header">
+          <div>
+            <p class="eyebrow">Variant C</p>
+            <h2>Thread Radar</h2>
+          </div>
+          <span class="badge">Best for intervention speed</span>
+        </div>
+        <p>The left side becomes a persistent radar for experiment control. It is still calm, but it prioritizes operator intervention paths over narration.</p>
+        <div class="stage">
+          <div class="topbar">
+            <span>MODE fleet</span><span>AUTH prest</span><span>FOCUS degraded thread</span><span>PAPER running</span><span>VERIFY required</span>
+          </div>
+          <div class="screen-c">
+            <div class="nav">
+              <strong>Radar</strong>
+              <div class="thread-grid">
+                <div class="thread"><strong>degraded</strong><span class="meta">1 thread needs action</span></div>
+                <div class="thread"><strong>paused</strong><span class="meta">2 threads holding context</span></div>
+                <div class="thread"><strong>healthy</strong><span class="meta">7 threads compounding signal</span></div>
+              </div>
+              <div class="actions"><span class="button primary">Restart selected</span><span class="button warn">Pause selected</span><span class="button danger">Stop selected</span></div>
+            </div>
+            <div class="column-stack">
+              <div class="bubble system"><div class="label">System</div><strong>perps-failure-reversal is now the most important object in the room.</strong><div class="meta">The leader is fine. The cost of not acting is letting one bad thread distort confidence.</div></div>
+              <div class="panel-grid" style="grid-template-columns: 1fr 320px; display:grid;">
+                <div class="panel-grid">
+                  <div class="thread"><strong>Selected thread</strong><span class="meta">failure_reversal · degraded · last gate: verification mismatch</span></div>
+                  <div class="thread"><strong>Expected result after restart</strong><span class="meta">Fresh cycle, new nonce, next verification should prove health recovery.</span></div>
+                  <div class="thread"><strong>Verify command</strong><span class="meta">Use the same status surface, not a second control path.</span></div>
+                  <div class="thread"><strong>Mission feed</strong><span class="meta">Events and room summaries collapse beneath the intervention path rather than above it.</span></div>
+                </div>
+                <div class="rail">
+                  <div class="context-block"><strong>Paper state</strong><span class="meta">$100,026 · 2 exposures</span></div>
+                  <div class="context-block"><strong>Leader</strong><span class="meta">trend-follow · 20.63</span></div>
+                  <div class="context-block"><strong>Postmortem</strong><span class="meta">Modal is still available, but secondary to immediate intervention.</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="notes">
+          <strong>Why it works</strong>
+          <ul>
+            <li>Fastest for active operator intervention.</li>
+            <li>Feels most like a command room.</li>
+            <li>Least narrative, most operational.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </div>
+</body>
+</html>

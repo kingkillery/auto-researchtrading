@@ -1,9 +1,13 @@
 import {
   Activity,
-  ArrowRight,
+  BarChart3,
   Bot,
   BrainCircuit,
+  Clock3,
+  Command,
+  Compass,
   Flame,
+  Layers3,
   Orbit,
   Radar,
   ShieldAlert,
@@ -12,15 +16,19 @@ import {
 } from 'lucide-react'
 import {
   startTransition,
+  useCallback,
   useDeferredValue,
   useEffect,
-  useEffectEvent,
+  useMemo,
   useState,
 } from 'react'
 import './App.css'
 
-type Lens = 'operator' | 'research' | 'risk'
+type Capability = 'mission' | 'fleet' | 'risk' | 'research'
 type ExperimentAction = 'start' | 'pause' | 'resume' | 'restart' | 'stop'
+type ManagerAction = 'start' | 'pause' | 'resume' | 'restart' | 'stop'
+type PaperAction = 'start' | 'restart' | 'stop'
+type ControlTarget = 'paper' | 'trainer' | 'experiment'
 
 type DashboardPayload = {
   meta?: {
@@ -42,36 +50,77 @@ type DashboardPayload = {
       equity?: number
       timestamp?: string
     }
+    engine?: {
+      equity?: number
+      running?: boolean
+      positions?: Record<string, number>
+    }
+  }
+  trading?: {
+    summary?: {
+      total_experiments?: number
+      best_score?: number | null
+      best_commit?: string | null
+    }
+  }
+  research?: {
+    summary?: {
+      total_runs?: number
+      best_val_bpb?: number | null
+      best_commit?: string | null
+    }
+  }
+  equity?: {
+    summary?: {
+      return_pct?: number
+    }
+  }
+  baseline_equity?: {
+    summary?: {
+      return_pct?: number
+    }
   }
   experiment_events?: ExperimentEvent[]
   experiments?: Experiment[]
-  workbench?: {
-    experiment_manager?: {
-      summary?: {
-        active_count?: number
-        decision_counts?: Record<string, number>
-        degraded_count?: number
-        drift_count?: number
-        experiment_count?: number
-        failed_count?: number
-        leader_id?: string | null
-        leader_score?: number | null
-        manager_state?: string
-        phase_counts?: Record<string, number>
-      }
-      state?: string
+  workbench?: WorkbenchSnapshot
+}
+
+type WorkbenchSnapshot = {
+  dashboard?: {
+    url?: string
+  }
+  paper?: {
+    running?: boolean
+    pid?: number
+    returncode?: number | null
+  }
+  experiment_manager?: {
+    state?: string
+    summary?: {
+      active_count?: number
+      paused_count?: number
+      failed_count?: number
+      degraded_count?: number
+      drift_count?: number
+      manager_state?: string
+      leader_id?: string | null
+      leader_score?: number | null
+      phase_counts?: Record<string, number>
+      decision_counts?: Record<string, number>
     }
   }
+  experiments?: Experiment[]
 }
 
 type Experiment = {
   id?: string
   hypothesis?: string
+  objective?: string
   state?: string
-  desired_state?: string
   phase?: string
   phase_detail?: string
   search_space?: string
+  split?: string
   symbols?: string[]
   health?: string
   degraded?: boolean
@@ -79,10 +128,14 @@ type Experiment = {
   health_reasons?: string[]
   best_score?: number | null
   iteration?: number
-  cycle_runtime_seconds?: number
-  last_completed_at?: string
+  cycle_runtime_seconds?: number | null
+  last_started_at?: string | null
+  last_completed_at?: string | null
+  last_phase_transition_at?: string | null
+  last_error?: string | null
+  last_exit_code?: number | null
   last_metrics?: {
-    score?: number
+    score?: number | null
   }
   last_decision?: {
     status?: string
@@ -91,6 +144,7 @@ type Experiment = {
   last_verification?: {
     failed_gates?: string[]
   }
+  command?: string[]
 }
 
 type ExperimentEvent = {
@@ -102,30 +156,35 @@ type ExperimentEvent = {
     phase_detail?: string
     health?: string
     search_space?: string
+    desired_state?: string
     decision?: {
       status?: string
     }
   }
 }
 
-type NarrativeBlock = {
-  eyebrow: string
-  headline: string
+type CapabilityMeta = {
+  label: string
+  icon: typeof Compass
   summary: string
-  bulletA: string
-  bulletB: string
-  bulletC: string
+  detail: string
 }
 
-type OpportunityCard = {
-  id: string
-  tone: 'accent' | 'warn' | 'danger'
+type TimelineSnapshot = {
+  eyebrow: string
   title: string
   detail: string
-  suggestion: string
-  action?: ExperimentAction
-  actionLabel?: string
+  metricA: string
+  metricB: string
+  metricC: string
 }
+
+type PostmortemDriver =
+  | 'model'
+  | 'execution'
+  | 'liquidity-exit'
+  | 'sizing'
+  | 'operational'
 
 const REFRESH_MS = 10000
 const currency = new Intl.NumberFormat('en-US', {
@@ -134,38 +193,56 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 })
 
-const lensMeta: Record<
-  Lens,
-  { label: string; note: string; icon: typeof Orbit }
-> = {
-  operator: {
-    label: 'Operator',
-    note: 'Favor interventions that stabilize and unblock the room.',
-    icon: Radar,
+const capabilityMeta: Record<Capability, CapabilityMeta> = {
+  mission: {
+    label: 'Mission',
+    icon: Command,
+    summary: 'Follow the room-wide command cadence and keep the leader moving.',
+    detail:
+      'Mission view centers the operational snapshot, live controls, and the latest event stream.',
   },
-  research: {
-    label: 'Research',
-    note: 'Prioritize which hypotheses deserve more iteration budget.',
-    icon: BrainCircuit,
+  fleet: {
+    label: 'Fleet',
+    icon: Layers3,
+    summary: 'Rank every thread by urgency, health, and reward.',
+    detail:
+      'Fleet view emphasizes the active experiment board and the controls attached to each thread.',
   },
   risk: {
     label: 'Risk',
-    note: 'Surface the stress points before they become false confidence.',
     icon: ShieldAlert,
+    summary: 'Intervene early when verification, drift, or health degrade.',
+    detail:
+      'Risk view prioritizes unhealthy threads, failed gates, and state drift before they become noise.',
+  },
+  research: {
+    label: 'Research',
+    icon: BrainCircuit,
+    summary: 'Compare search spaces, score leaders, and benchmark the edge.',
+    detail:
+      'Research view foregrounds the strongest experiments, return curves, and best validation runs.',
   },
 }
 
+const capabilityOrder: Capability[] = ['mission', 'fleet', 'risk', 'research']
+const EMPTY_EXPERIMENTS: Experiment[] = []
+const EMPTY_EVENTS: ExperimentEvent[] = []
+const EMPTY_ACTIONS: NonNullable<DashboardPayload['actions']> = []
+const postmortemDrivers: Array<{ value: PostmortemDriver; label: string }> = [
+  { value: 'model', label: 'Model' },
+  { value: 'execution', label: 'Execution' },
+  { value: 'liquidity-exit', label: 'Liquidity / exit' },
+  { value: 'sizing', label: 'Sizing' },
+  { value: 'operational', label: 'Operational' },
+]
+
 function scoreOf(experiment: Experiment): number | null {
-  if (typeof experiment.best_score === 'number') {
-    return experiment.best_score
-  }
-  if (typeof experiment.last_metrics?.score === 'number') {
-    return experiment.last_metrics.score
-  }
+  if (typeof experiment.best_score === 'number') return experiment.best_score
+  if (typeof experiment.last_metrics?.score === 'number') return experiment.last_metrics.score
   return null
 }
 
-function money(value: number | undefined): string {
+function money(value: number | undefined | null): string {
   return typeof value === 'number' && Number.isFinite(value)
     ? currency.format(value)
     : '--'
@@ -177,7 +254,13 @@ function decimal(value: number | null | undefined, digits = 2): string {
     : '--'
 }
 
-function stamp(value: string | undefined): string {
+function percent(value: number | null | undefined, digits = 1): string {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toFixed(digits)}%`
+    : '--'
+}
+
+function stamp(value: string | null | undefined): string {
   if (!value) return '--'
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime())
@@ -190,209 +273,201 @@ function stamp(value: string | undefined): string {
       })
 }
 
+function shortClock(value: string | null | undefined): string {
+  if (!value) return '--'
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+function compactList(values: string[] | undefined, limit = 3): string {
+  const filtered = (values || []).filter(Boolean)
+  if (!filtered.length) return '--'
+  return filtered.slice(0, limit).join(', ') + (filtered.length > limit ? ' …' : '')
+}
+
+function compactCommand(command: string[] | undefined): string {
+  if (!command || command.length === 0) return '--'
+  const preview = command.slice(0, 6).join(' ')
+  return command.length > 6 ? `${preview} …` : preview
+}
+
 function stateTone(experiment: Experiment): 'accent' | 'warn' | 'danger' {
-  if (experiment.degraded || experiment.health === 'failed') return 'danger'
-  if (experiment.state === 'paused' || experiment.health === 'degraded') return 'warn'
+  if (experiment.degraded || experiment.health === 'failed' || experiment.last_error) {
+    return 'danger'
+  }
+  if (experiment.state === 'paused' || experiment.health === 'degraded') {
+    return 'warn'
+  }
   return 'accent'
 }
 
-function recommendationFor(experiment: Experiment): OpportunityCard {
-  const id = experiment.id || 'unknown-thread'
-  const score = scoreOf(experiment)
-  const failedGates = experiment.last_verification?.failed_gates || []
-
-  if (experiment.degraded || failedGates.length) {
-    return {
-      id,
-      tone: 'danger',
-      title: `${id} needs a reset path`,
-      detail:
-        failedGates.length > 0
-          ? `Verifier blocked ${failedGates.join(', ')} and the thread should be restarted with a narrower acceptance envelope.`
-          : 'Health flags are active, which makes the current state too noisy to trust.',
-      suggestion: 'Restart the thread and inspect the most recent degraded reasons before letting it re-enter the pool.',
-      action: 'restart',
-      actionLabel: 'Restart thread',
-    }
-  }
-
-  if (experiment.state === 'stopped') {
-    return {
-      id,
-      tone: 'accent',
-      title: `${id} is idle inventory`,
-      detail: 'The hypothesis is offline even though it still occupies semantic space in the room.',
-      suggestion: 'Start it if the search space is still relevant, otherwise leave it out of the active rotation.',
-      action: 'start',
-      actionLabel: 'Start thread',
-    }
-  }
-
-  if (experiment.state === 'paused') {
-    return {
-      id,
-      tone: 'warn',
-      title: `${id} is paused with unfinished context`,
-      detail: 'The thread has recent context but is not consuming more cycle budget right now.',
-      suggestion: 'Resume it if the thesis still diversifies the leader rather than duplicating it.',
-      action: 'resume',
-      actionLabel: 'Resume thread',
-    }
-  }
-
-  if (typeof score === 'number' && score < 0) {
-    return {
-      id,
-      tone: 'warn',
-      title: `${id} is burning cycle budget`,
-      detail: `Current score is ${decimal(score)} and the thread is not earning live attention.`,
-      suggestion: 'Pause it and fold the failure mode into the next prompt or verifier gate.',
-      action: 'pause',
-      actionLabel: 'Pause thread',
-    }
-  }
-
-  return {
-    id,
-    tone: 'accent',
-    title: `${id} is behaving like a keeper`,
-    detail: 'No intervention is needed right now; the thread is compounding useful signal.',
-    suggestion: 'Let it run and compare its phase cadence against the rest of the room.',
-  }
-}
-
-function narrativeFor(payload: DashboardPayload, lens: Lens): NarrativeBlock {
-  const summary = payload.workbench?.experiment_manager?.summary || {}
-  const experiments = payload.experiments || []
-  const paperEquity = payload.paper?.portfolio?.equity
-  const activeCount = summary.active_count ?? 0
-  const degradedCount = summary.degraded_count ?? 0
-  const failedCount = summary.failed_count ?? 0
-  const leaderId = summary.leader_id || 'no leader yet'
-  const leaderScore = summary.leader_score
-  const openPositions = payload.paper?.positions || []
-  const scores = experiments
-    .map((experiment) => scoreOf(experiment))
-    .filter((value): value is number => typeof value === 'number')
-    .sort((left, right) => right - left)
-  const medianScore =
-    scores.length > 0 ? scores[Math.floor(scores.length / 2)] : null
-
-  if (lens === 'research') {
-    return {
-      eyebrow: 'Research Lens',
-      headline: `${leaderId} is the benchmark, but the room still has headroom.`,
-      summary: `The current leader is sitting at ${decimal(
-        leaderScore,
-      )} while the median tracked score is ${decimal(
-        medianScore,
-      )}. This lens biases toward experiments that widen the search surface rather than merely matching the incumbent.`,
-      bulletA: `Highest leverage move: compare the leader against the strongest non-leader search space and decide whether you have real diversification or a disguised clone.`,
-      bulletB: `Operator context: ${activeCount} threads are live, which is enough to explore but still small enough to keep prompt drift visible.`,
-      bulletC: `Paper context: ${money(
-        paperEquity,
-      )} in equity means the room is not abstract; every false positive eventually reaches live operator attention.`,
-    }
-  }
-
-  if (lens === 'risk') {
-    return {
-      eyebrow: 'Risk Lens',
-      headline: `The room is only as trustworthy as its weakest thread.`,
-      summary: `${degradedCount} degraded and ${failedCount} failed threads are the pressure points. This lens privileges intervention over discovery and looks for stale status, verifier misses, and score decay before they become narrative momentum.`,
-      bulletA: `Immediate check: ${openPositions.length} paper positions are open, so execution state can diverge from research state if the dashboard gets noisy.`,
-      bulletB: `Leader dependency: ${leaderId} should not be allowed to monopolize confidence without a healthy challenger behind it.`,
-      bulletC: `The safest habit here is to restart unhealthy threads fast and only then re-read their hypotheses.`,
-    }
-  }
-
-  return {
-    eyebrow: 'Operator Lens',
-    headline: `${leaderId} is steering the room while ${activeCount} threads stay in motion.`,
-    summary: `The control plane is currently watching ${activeCount} active hypotheses with ${degradedCount} degraded and ${failedCount} failed. This lens optimizes for smooth, confident intervention rather than deep post-hoc analysis.`,
-    bulletA: `Paper equity is ${money(
-      paperEquity,
-    )}, which keeps the room grounded in a live-ish outcome instead of a passive leaderboard.`,
-    bulletB: `Leader score is ${decimal(
-      leaderScore,
-    )}; if that stays high while the rest of the room stalls, the operator should start pruning rather than just restarting.`,
-    bulletC: `The best next move is usually a small number of decisive actions, not another full scan of every panel.`,
-  }
-}
-
-function sortExperiments(experiments: Experiment[], lens: Lens): Experiment[] {
-  return [...experiments].sort((left, right) => {
-    const leftScore = scoreOf(left) ?? Number.NEGATIVE_INFINITY
-    const rightScore = scoreOf(right) ?? Number.NEGATIVE_INFINITY
-
-    if (lens === 'risk') {
-      const leftRisk = Number(Boolean(left.degraded)) + Number(left.health === 'degraded')
-      const rightRisk = Number(Boolean(right.degraded)) + Number(right.health === 'degraded')
-      if (rightRisk !== leftRisk) return rightRisk - leftRisk
-      return leftScore - rightScore
-    }
-
-    if (lens === 'operator') {
-      const leftUrgency =
-        Number(left.state === 'paused' || left.state === 'stopped') +
-        Number(Boolean(left.degraded))
-      const rightUrgency =
-        Number(right.state === 'paused' || right.state === 'stopped') +
-        Number(Boolean(right.degraded))
-      if (rightUrgency !== leftUrgency) return rightUrgency - leftUrgency
-    }
-
-    return rightScore - leftScore
-  })
-}
-
-function phaseEntries(experiments: Experiment[]) {
-  const counts = new Map<string, number>()
-  for (const experiment of experiments) {
-    const phase = experiment.phase || experiment.state || 'unknown'
-    counts.set(phase, (counts.get(phase) || 0) + 1)
-  }
-  return [...counts.entries()].sort((left, right) => right[1] - left[1])
-}
-
-function eventTone(event: ExperimentEvent): 'accent' | 'warn' | 'danger' {
+function actionTone(event: ExperimentEvent): 'accent' | 'warn' | 'danger' {
   if (event.payload?.health === 'failed') return 'danger'
   if (event.payload?.decision?.status === 'rejected') return 'warn'
   if (event.payload?.health === 'degraded') return 'warn'
   return 'accent'
 }
 
+function actionKey(target: ControlTarget, action: string, experimentId?: string): string {
+  return `${target}:${action}:${experimentId || 'all'}`
+}
+
+function eventSummary(event: ExperimentEvent): string {
+  const parts = [event.payload?.phase, event.payload?.phase_detail, event.payload?.health]
+    .filter(Boolean)
+    .join(' · ')
+  if (parts) return parts
+  if (event.payload?.decision?.status) return `decision · ${event.payload.decision.status}`
+  return event.experiment_id || 'manager'
+}
+
+function actionLabel(action: ExperimentAction | ManagerAction | PaperAction): string {
+  return action.charAt(0).toUpperCase() + action.slice(1)
+}
+
+async function readJsonResponse<T>(response: Response, route: string): Promise<T> {
+  const text = await response.text()
+  if (!text) return {} as T
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    const snippet = text.slice(0, 120).replace(/\s+/g, ' ').trim()
+    throw new Error(
+      `Unexpected non-JSON response from ${route}${
+        snippet ? `: ${snippet}` : ''
+      }`,
+    )
+  }
+}
+
+function sortExperiments(experiments: Experiment[], capability: Capability): Experiment[] {
+  return [...experiments].sort((left, right) => {
+    const leftScore = scoreOf(left) ?? Number.NEGATIVE_INFINITY
+    const rightScore = scoreOf(right) ?? Number.NEGATIVE_INFINITY
+    const leftRisk =
+      Number(Boolean(left.degraded)) +
+      Number(left.health === 'degraded') +
+      Number(Boolean(left.last_error))
+    const rightRisk =
+      Number(Boolean(right.degraded)) +
+      Number(right.health === 'degraded') +
+      Number(Boolean(right.last_error))
+    const leftUrgency =
+      Number(left.state === 'paused' || left.state === 'stopped') +
+      Number(Boolean(left.degraded)) +
+      Number(Boolean(left.last_error))
+    const rightUrgency =
+      Number(right.state === 'paused' || right.state === 'stopped') +
+      Number(Boolean(right.degraded)) +
+      Number(Boolean(right.last_error))
+    const leftFreshness = new Date(
+      left.last_phase_transition_at || left.last_completed_at || left.last_started_at || 0,
+    ).getTime()
+    const rightFreshness = new Date(
+      right.last_phase_transition_at || right.last_completed_at || right.last_started_at || 0,
+    ).getTime()
+
+    if (capability === 'risk') {
+      if (rightRisk !== leftRisk) return rightRisk - leftRisk
+      if (rightScore !== leftScore) return leftScore - rightScore
+      return rightFreshness - leftFreshness
+    }
+
+    if (capability === 'fleet') {
+      if (rightUrgency !== leftUrgency) return rightUrgency - leftUrgency
+      if (rightScore !== leftScore) return rightScore - leftScore
+      return rightFreshness - leftFreshness
+    }
+
+    if (capability === 'research') {
+      if (rightScore !== leftScore) return rightScore - leftScore
+      const leftIteration = left.iteration ?? 0
+      const rightIteration = right.iteration ?? 0
+      if (rightIteration !== leftIteration) return rightIteration - leftIteration
+      return rightFreshness - leftFreshness
+    }
+
+    if (rightUrgency !== leftUrgency) return rightUrgency - leftUrgency
+    if (rightScore !== leftScore) return rightScore - leftScore
+    return rightFreshness - leftFreshness
+  })
+}
+
+function buildTimelineSnapshot(
+  payload: DashboardPayload,
+  capability: Capability,
+  selectedThread: Experiment | null,
+): TimelineSnapshot {
+  const summary = payload.workbench?.experiment_manager?.summary || {}
+  const research = payload.research?.summary || {}
+  const trading = payload.trading?.summary || {}
+  const leaderId = summary.leader_id || selectedThread?.id || 'no leader'
+  const activeCount = summary.active_count ?? 0
+  const degradedCount = summary.degraded_count ?? 0
+  const failedCount = summary.failed_count ?? 0
+  const managerState =
+    summary.manager_state || payload.workbench?.experiment_manager?.state || 'running'
+  const capabilityLabel = capabilityMeta[capability].label
+
+  return {
+    eyebrow: `${capabilityLabel} focus`,
+    title: `${leaderId} is steering ${activeCount} active threads.`,
+    detail:
+      capability === 'risk'
+        ? `Risk focus is now on ${degradedCount} degraded and ${failedCount} failed threads, plus any drift on the selected leader.`
+        : capability === 'research'
+          ? `Research focus is comparing ${research.total_runs ?? 0} validation runs against the strongest thread and the latest trading score.`
+          : `Manager state is ${managerState}; the command surface should keep the leader, paper engine, and fleet moving in lockstep.`,
+    metricA: `leader ${leaderId}`,
+    metricB: `active ${activeCount} / degraded ${degradedCount}`,
+    metricC:
+      capability === 'research'
+        ? `best score ${decimal(trading.best_score)}`
+        : capability === 'risk'
+          ? `failed ${failedCount}`
+          : `paper ${money(payload.paper?.portfolio?.equity)}`,
+  }
+}
+
 function App() {
   const [payload, setPayload] = useState<DashboardPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [lens, setLens] = useState<Lens>('operator')
-  const [pendingAction, setPendingAction] = useState<string | null>(null)
-  const [statusNote, setStatusNote] = useState('Loading generative operator surface...')
+  const [statusNote, setStatusNote] = useState('Loading mission control surface...')
+  const [selectedCapability, setSelectedCapability] = useState<Capability>('mission')
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
+  const [pendingControl, setPendingControl] = useState<string | null>(null)
+  const [postmortemOpen, setPostmortemOpen] = useState(false)
+  const [postmortemDriver, setPostmortemDriver] = useState<PostmortemDriver>('model')
+  const [postmortemWorked, setPostmortemWorked] = useState('')
+  const [postmortemFailed, setPostmortemFailed] = useState('')
+  const [postmortemGuardrail, setPostmortemGuardrail] = useState('')
+  const [postmortemStatus, setPostmortemStatus] = useState('Capture the outcome while the room is still fresh.')
 
-  const deferredLens = useDeferredValue(lens)
+  const deferredCapability = useDeferredValue(selectedCapability)
   const embedded = window.self !== window.top
 
-  const refreshDashboard = useEffectEvent(async () => {
+  const refreshDashboard = useCallback(async () => {
     try {
       const response = await fetch('/api/dashboard', { cache: 'no-store' })
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
-      const nextPayload: DashboardPayload = await response.json()
+      const nextPayload = await readJsonResponse<DashboardPayload>(response, '/api/dashboard')
       startTransition(() => {
         setPayload(nextPayload)
         setError(null)
-        setStatusNote('Live payload synced from /api/dashboard.')
+        setStatusNote(`Live payload synced from /api/dashboard at ${stamp(nextPayload.meta?.generated_at)}`)
       })
     } catch (refreshError) {
-      const message =
-        refreshError instanceof Error ? refreshError.message : 'Unknown error'
+      const message = refreshError instanceof Error ? refreshError.message : 'Unknown error'
       startTransition(() => {
         setError(message)
         setStatusNote(`Refresh failed: ${message}`)
       })
     }
-  })
+  }, [])
 
   useEffect(() => {
     void refreshDashboard()
@@ -402,339 +477,839 @@ function App() {
     return () => window.clearInterval(timer)
   }, [refreshDashboard])
 
-  const runSuggestedAction = useEffectEvent(
-    async (experimentId: string, action: ExperimentAction) => {
-      setPendingAction(experimentId)
-      setStatusNote(`Sending ${action} to ${experimentId}...`)
+  const runControl = useCallback(
+    async (
+      target: ControlTarget,
+      action: ExperimentAction | ManagerAction | PaperAction,
+      experimentId?: string,
+    ) => {
+      const key = actionKey(target, action, experimentId)
+      setPendingControl(key)
+      setStatusNote(`Sending ${action} to ${target}${experimentId ? ` / ${experimentId}` : ''}...`)
+
       try {
         const response = await fetch('/api/workbench/control', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            target: 'experiment',
+            target,
             action,
             experiment_id: experimentId,
           }),
         })
-        const result = await response.json()
+        const result = await readJsonResponse<{ ok?: boolean; error?: string }>(
+          response,
+          '/api/workbench/control',
+        )
         if (!response.ok || !result.ok) {
           throw new Error(result.error || `HTTP ${response.status}`)
         }
         await refreshDashboard()
-        setStatusNote(`${experimentId} ${action} completed.`)
+        setStatusNote(`${actionLabel(action)} on ${target}${experimentId ? ` / ${experimentId}` : ''} completed.`)
       } catch (actionError) {
-        const message =
-          actionError instanceof Error ? actionError.message : 'Unknown error'
-        setStatusNote(`${experimentId} ${action} failed: ${message}`)
+        const message = actionError instanceof Error ? actionError.message : 'Unknown error'
+        setStatusNote(`${actionLabel(action)} on ${target} failed: ${message}`)
       } finally {
-        setPendingAction(null)
+        setPendingControl(null)
       }
     },
+    [refreshDashboard],
   )
 
-  const managerSummary = payload?.workbench?.experiment_manager?.summary || {}
-  const experiments = payload?.experiments || []
-  const events = payload?.experiment_events || []
-  const narrative = narrativeFor(payload || {}, deferredLens)
-  const topOpportunities = sortExperiments(experiments, deferredLens)
-    .slice(0, 4)
-    .map((experiment) => recommendationFor(experiment))
-  const phases = phaseEntries(experiments).slice(0, 6)
-  const decisions = Object.entries(managerSummary.decision_counts || {})
-  const livePositions = payload?.paper?.positions || []
-  const leadActions = (payload?.actions || []).slice(0, 3)
-  const lensCard = lensMeta[deferredLens]
-  const LensIcon = lensCard.icon
+  const workbench = payload?.workbench || {}
+  const manager = workbench.experiment_manager || {}
+  const summary = manager.summary || {}
+  const experiments = workbench.experiments ?? payload?.experiments ?? EMPTY_EXPERIMENTS
+  const events = payload?.experiment_events ?? EMPTY_EVENTS
+  const actions = payload?.actions ?? EMPTY_ACTIONS
+  const selectedThread =
+    experiments.find((experiment) => experiment.id === selectedThreadId) ||
+    (summary.leader_id
+      ? experiments.find((experiment) => experiment.id === summary.leader_id) || null
+      : null) ||
+    experiments[0] ||
+    null
+
+  useEffect(() => {
+    if (!experiments.length) {
+      if (selectedThreadId !== null) {
+        setSelectedThreadId(null)
+      }
+      return
+    }
+    const currentExists = selectedThreadId
+      ? experiments.some((experiment) => experiment.id === selectedThreadId)
+      : false
+    if (!currentExists) {
+      setSelectedThreadId(summary.leader_id || experiments[0]?.id || null)
+    }
+  }, [experiments, selectedThreadId, summary.leader_id])
+
+  const capabilityCard = capabilityMeta[deferredCapability]
+  const CapabilityIcon = capabilityCard.icon
+  const timelineSnapshot = buildTimelineSnapshot(payload || {}, deferredCapability, selectedThread)
+  const sortedFleet = sortExperiments(experiments, deferredCapability)
+  const recentEvents = events.slice(0, 8)
+  const recentActions = actions.slice(0, 3)
+  const paperPositions = payload?.paper?.positions || []
+  const paperRunning = Boolean(workbench.paper?.running)
+  const managerState = summary.manager_state || manager.state || 'running'
+  const managerActions: ManagerAction[] =
+    managerState === 'stopped'
+      ? ['start', 'restart']
+      : managerState === 'paused'
+        ? ['resume', 'restart', 'stop']
+        : ['pause', 'restart', 'stop']
+  const paperActions: PaperAction[] = paperRunning ? ['stop', 'restart'] : ['start']
+  const selectedThreadActions: ExperimentAction[] =
+    selectedThread?.state === 'paused'
+      ? ['resume', 'restart', 'stop']
+      : selectedThread?.state === 'stopped'
+        ? ['start', 'restart']
+        : ['pause', 'restart', 'stop']
+
+  const fleetCounts = {
+    total: experiments.length,
+    active: summary.active_count ?? 0,
+    degraded: summary.degraded_count ?? 0,
+    failed: summary.failed_count ?? 0,
+  }
+
+  const equitySummary = payload?.equity?.summary
+  const baselineSummary = payload?.baseline_equity?.summary
+  const researchSummary = payload?.research?.summary
+  const tradingSummary = payload?.trading?.summary
+  const postmortemMarkdown = useMemo(() => {
+    const snapshotStamp = new Date().toISOString()
+    const selectedThreadSummary = selectedThread?.id
+      ? `- Selected thread: ${selectedThread.id}\n- Thread state: ${selectedThread.state || '--'}\n- Thread score: ${decimal(scoreOf(selectedThread))}`
+      : '- Selected thread: none'
+    return [
+      `## ${snapshotStamp} - Auto-Research postmortem`,
+      '',
+      '### Snapshot',
+      `- UTC timestamp: ${snapshotStamp}`,
+      `- Paper equity: ${money(payload?.paper?.portfolio?.equity)}`,
+      `- Leader thread: ${summary.leader_id || '--'}`,
+      `- Active / degraded / failed: ${fleetCounts.active} / ${fleetCounts.degraded} / ${fleetCounts.failed}`,
+      selectedThreadSummary,
+      '',
+      '### Primary driver',
+      `- ${postmortemDrivers.find((item) => item.value === postmortemDriver)?.label || 'Model'}`,
+      '',
+      '### What worked',
+      postmortemWorked || '- ',
+      '',
+      '### What failed',
+      postmortemFailed || '- ',
+      '',
+      '### New guardrail',
+      postmortemGuardrail || '- ',
+      '',
+      '### Recommended follow-through',
+      '- Append this entry to docs/trade_postmortems.md',
+      '- Add the guardrail to AGENTS.md, a skill, or code if it should become enforceable',
+      '- Re-run the relevant verification command before the next live-sensitive action',
+    ].join('\n')
+  }, [
+    fleetCounts.active,
+    fleetCounts.degraded,
+    fleetCounts.failed,
+    payload?.paper?.portfolio?.equity,
+    postmortemDriver,
+    postmortemFailed,
+    postmortemGuardrail,
+    postmortemWorked,
+    selectedThread,
+    summary.leader_id,
+  ])
 
   return (
     <main className={`workspace ${embedded ? 'workspace--embedded' : ''}`}>
-      <section className="hero-shell">
-        <div className="hero-shell__mesh" />
-        <div className="hero-shell__topline">
-          <div className="brand-lockup">
-            <img className="brand-lockup__mark" src="/assets/logo.png" alt="" />
+      <section className="dashboard-surface">
+        <header className="panel command-rail">
+          <div className="command-rail__lead">
+            <div className="brand-mark">
+              <Sparkles size={20} />
+            </div>
             <div>
-              <p className="eyebrow">Codex generative dashboard artifact</p>
-              <h1>Compose the room around what changed, not around fixed tiles.</h1>
+              <p className="eyebrow">Chat-first mission control</p>
+              <h1>Direct the room from the same surface that explains it.</h1>
+              <p className="command-rail__lede">
+                The dashboard speaks in live state, but the controls remain explicit:
+                refresh the payload, steer the manager, and intervene at the thread level.
+              </p>
             </div>
           </div>
-          <div className="hero-shell__links">
-            <a className="ghost-link" href="/" target="_blank" rel="noreferrer">
+
+          <div className="command-rail__transcript">
+            <div className="chat-bubble chat-bubble--system">
+              <span className="chat-bubble__label">System</span>
+              <p>{statusNote}</p>
+            </div>
+            <div className="chat-bubble chat-bubble--operator">
+              <span className="chat-bubble__label">Operator</span>
+              <p>
+                {capabilityCard.summary} Use the rail to move the manager, paper feed,
+                or the selected thread without leaving this workspace.
+              </p>
+            </div>
+          </div>
+
+          <div className="command-rail__actions">
+            <div className="command-group">
+              <span className="command-group__label">Manager</span>
+              <div className="command-group__buttons">
+                {managerActions.map((action) => {
+                  const key = actionKey('trainer', action)
+                  return (
+                    <button
+                      key={key}
+                      className="rail-button"
+                      disabled={pendingControl === key}
+                      type="button"
+                      onClick={() => void runControl('trainer', action)}
+                    >
+                      {pendingControl === key ? 'Sending...' : actionLabel(action)}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="command-group">
+              <span className="command-group__label">Paper</span>
+              <div className="command-group__buttons">
+                {paperActions.map((action) => {
+                  const key = actionKey('paper', action)
+                  return (
+                    <button
+                      key={key}
+                      className="rail-button"
+                      disabled={pendingControl === key}
+                      type="button"
+                      onClick={() => void runControl('paper', action)}
+                    >
+                      {pendingControl === key ? 'Sending...' : actionLabel(action)}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <a
+              className="rail-link"
+              href={workbench.dashboard?.url || '/'}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Command size={16} />
               Open native dashboard
             </a>
           </div>
-        </div>
+        </header>
 
-        <div className="hero-grid">
-          <article className="hero-copy panel panel--hero">
-            <div className="story-kicker">
-              <Sparkles size={16} />
-              <span>{narrative.eyebrow}</span>
-            </div>
-            <h2>{narrative.headline}</h2>
-            <p className="hero-copy__summary">{narrative.summary}</p>
-            <div className="bullet-stack">
-              <div>{narrative.bulletA}</div>
-              <div>{narrative.bulletB}</div>
-              <div>{narrative.bulletC}</div>
-            </div>
-          </article>
+        <nav className="panel capability-nav" aria-label="Capability navigation">
+          {capabilityOrder.map((capability) => {
+            const meta = capabilityMeta[capability]
+            const Icon = meta.icon
+            const value =
+              capability === 'mission'
+                ? fleetCounts.active
+                : capability === 'fleet'
+                  ? fleetCounts.total
+                  : capability === 'risk'
+                    ? fleetCounts.degraded + fleetCounts.failed
+                    : researchSummary?.total_runs ?? 0
+            return (
+              <button
+                key={capability}
+                className={`capability-chip ${capability === selectedCapability ? 'capability-chip--active' : ''}`}
+                type="button"
+                onClick={() => setSelectedCapability(capability)}
+              >
+                <Icon size={16} />
+                <span>{meta.label}</span>
+                <strong>{value}</strong>
+              </button>
+            )
+          })}
+        </nav>
 
-          <article className="lens-panel panel">
+        <div className="dashboard-grid">
+          <aside className="panel rail rail--fleet">
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Lenses</p>
-                <h3>Shift the generated readout</h3>
+                <p className="eyebrow">Thread fleet board</p>
+                <h2>Every experiment, sorted for the current lens.</h2>
               </div>
-              <LensIcon size={18} />
+              <Layers3 size={18} />
             </div>
-            <div className="lens-switcher">
-              {(['operator', 'research', 'risk'] as Lens[]).map((value) => {
-                const meta = lensMeta[value]
-                const Icon = meta.icon
-                return (
+
+            <div className="metric-strip">
+              <div className="metric-card">
+                <span>Threads</span>
+                <strong>{fleetCounts.total}</strong>
+              </div>
+              <div className="metric-card">
+                <span>Active</span>
+                <strong>{fleetCounts.active}</strong>
+              </div>
+              <div className="metric-card">
+                <span>Risk</span>
+                <strong>{fleetCounts.degraded + fleetCounts.failed}</strong>
+              </div>
+            </div>
+
+            <div className="fleet-board">
+              {sortedFleet.length > 0 ? (
+                sortedFleet.map((experiment, index) => {
+                  const score = scoreOf(experiment)
+                  const selected = experiment.id && experiment.id === selectedThread?.id
+                  const stateActionSet: ExperimentAction[] =
+                    experiment.state === 'paused'
+                      ? ['resume', 'restart', 'stop']
+                      : experiment.state === 'stopped'
+                        ? ['start', 'restart']
+                        : ['pause', 'restart', 'stop']
+                  return (
+                    <article
+                      key={experiment.id || `thread-${index}`}
+                      className={`thread-card tone-${stateTone(experiment)} ${selected ? 'thread-card--selected' : ''}`}
+                      onClick={() => setSelectedThreadId(experiment.id || null)}
+                    >
+                      <div className="thread-card__topline">
+                        <div>
+                          <strong>{experiment.id || 'unknown-thread'}</strong>
+                          <span>{experiment.phase || experiment.state || '--'}</span>
+                        </div>
+                        <span className="thread-card__select">{selected ? 'Focused' : 'Inspect'}</span>
+                      </div>
+
+                      <p className="thread-card__lead">
+                        {experiment.hypothesis || experiment.objective || experiment.search_space || 'No hypothesis text is available.'}
+                      </p>
+
+                      <div className="thread-card__meta">
+                        <span>score {decimal(score)}</span>
+                        <span>iter {experiment.iteration ?? 0}</span>
+                        <span>{compactList(experiment.symbols)}</span>
+                      </div>
+
+                      <div className="thread-card__tags">
+                        <span>{experiment.search_space || 'search space unset'}</span>
+                        <span>{experiment.health || 'health unknown'}</span>
+                      </div>
+
+                      <div className="thread-card__actions">
+                        {stateActionSet.map((action) => {
+                          const key = actionKey('experiment', action, experiment.id)
+                          return (
+                            <button
+                              key={key}
+                              className="thread-action"
+                              disabled={pendingControl === key || !experiment.id}
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                if (!experiment.id) return
+                                void runControl('experiment', action, experiment.id)
+                              }}
+                            >
+                              {pendingControl === key ? 'Sending...' : actionLabel(action)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </article>
+                  )
+                })
+              ) : (
+                <div className="empty-state">No experiment inventory is available yet.</div>
+              )}
+            </div>
+          </aside>
+
+          <section className="panel rail rail--timeline">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Mission timeline</p>
+                <h2>Chronology first, explanation second.</h2>
+              </div>
+              <Clock3 size={18} />
+            </div>
+
+            <article className={`timeline-snapshot tone-${selectedCapability}`}>
+              <div className="timeline-snapshot__icon">
+                <CapabilityIcon size={18} />
+              </div>
+              <div className="timeline-snapshot__body">
+                <p className="timeline-snapshot__eyebrow">{timelineSnapshot.eyebrow}</p>
+                <strong>{timelineSnapshot.title}</strong>
+                <p>{timelineSnapshot.detail}</p>
+                <div className="timeline-snapshot__metrics">
+                  <span>{timelineSnapshot.metricA}</span>
+                  <span>{timelineSnapshot.metricB}</span>
+                  <span>{timelineSnapshot.metricC}</span>
+                </div>
+              </div>
+            </article>
+
+            <div className="timeline-stack">
+              {recentEvents.length > 0 ? (
+                recentEvents.map((event, index) => {
+                  const tone = actionTone(event)
+                  return (
+                    <article
+                      key={`${event.timestamp || 'event'}-${index}`}
+                      className={`timeline-item tone-${tone}`}
+                    >
+                      <div className="timeline-item__rail" />
+                      <div className="timeline-item__body">
+                        <div className="timeline-item__topline">
+                          <div>
+                            <strong>{event.type || 'event'}</strong>
+                            <span>{event.experiment_id || 'manager'}</span>
+                          </div>
+                          <span>{stamp(event.timestamp)}</span>
+                        </div>
+                        <p className="timeline-item__detail">{eventSummary(event)}</p>
+                        <div className="timeline-item__meta">
+                          <span>{event.payload?.search_space || 'search space n/a'}</span>
+                          <span>{event.payload?.desired_state || '--'}</span>
+                          <span>{event.payload?.decision?.status || '--'}</span>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })
+              ) : (
+                <div className="empty-state">No manager events are available yet.</div>
+              )}
+            </div>
+
+            <div className="timeline-footer">
+              <div className="timeline-footer__card">
+                <span>Generated</span>
+                <strong>{stamp(payload?.meta?.generated_at)}</strong>
+              </div>
+              <div className="timeline-footer__card">
+                <span>Manager</span>
+                <strong>{managerState}</strong>
+              </div>
+              <div className="timeline-footer__card">
+                <span>Prompt spec</span>
+                <strong>{payload?.meta?.strategy_spec ? 'loaded' : 'unavailable'}</strong>
+              </div>
+            </div>
+          </section>
+
+          <aside className="panel rail rail--context">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Right context rail</p>
+                <h2>Live state, actions, and benchmarks.</h2>
+              </div>
+              <Orbit size={18} />
+            </div>
+
+            <div className="context-stack">
+              <article className="context-card">
+                <div className="context-card__header">
+                  <div>
+                    <p className="context-card__eyebrow">Command state</p>
+                    <strong>{statusNote}</strong>
+                  </div>
+                  <Activity size={16} />
+                </div>
+                <div className="context-chip-row">
+                  <span className="context-chip">Manager {managerState}</span>
+                  <span className="context-chip">Paper {paperRunning ? 'running' : 'idle'}</span>
+                  <span className="context-chip">Leader {summary.leader_id || '--'}</span>
+                </div>
+                <p className="context-card__detail">{capabilityCard.detail}</p>
+                <div className="mini-actions">
                   <button
-                    key={value}
-                    className={`lens-chip ${
-                      value === lens ? 'lens-chip--active' : ''
-                    }`}
-                    onClick={() => setLens(value)}
+                    className="thread-action thread-action--compact"
                     type="button"
+                    onClick={() => setPostmortemOpen(true)}
                   >
-                    <Icon size={16} />
-                    <span>{meta.label}</span>
+                    Open postmortem
                   </button>
-                )
-              })}
-            </div>
-            <p className="panel-note">{lensCard.note}</p>
-            <div className="status-ribbon">
-              <span>{statusNote}</span>
-              <span>{stamp(payload?.meta?.generated_at)}</span>
-            </div>
-          </article>
-        </div>
+                </div>
+              </article>
 
-        <div className="signal-row">
-          <article className="signal-tile">
-            <span className="signal-tile__label">Paper equity</span>
-            <strong>{money(payload?.paper?.portfolio?.equity)}</strong>
-            <span className="signal-tile__detail">
-              {livePositions.length > 0
-                ? `${livePositions.length} live paper positions`
-                : 'No paper exposure open'}
-            </span>
-          </article>
-          <article className="signal-tile">
-            <span className="signal-tile__label">Leader thread</span>
-            <strong>{managerSummary.leader_id || '--'}</strong>
-            <span className="signal-tile__detail">
-              Score {decimal(managerSummary.leader_score)}
-            </span>
-          </article>
-          <article className="signal-tile">
-            <span className="signal-tile__label">Active / degraded</span>
-            <strong>
-              {managerSummary.active_count ?? 0} / {managerSummary.degraded_count ?? 0}
-            </strong>
-            <span className="signal-tile__detail">
-              Failed {managerSummary.failed_count ?? 0}, drifted{' '}
-              {managerSummary.drift_count ?? 0}
-            </span>
-          </article>
-          <article className="signal-tile">
-            <span className="signal-tile__label">Decision mix</span>
-            <strong>
-              {Object.entries(managerSummary.decision_counts || {})
-                .map(([key, value]) => `${key}:${value}`)
-                .join(' · ') || '--'}
-            </strong>
-            <span className="signal-tile__detail">
-              Manager state {payload?.workbench?.experiment_manager?.state || '--'}
-            </span>
-          </article>
-        </div>
-      </section>
-
-      <section className="content-grid">
-        <article className="panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Generated moves</p>
-              <h3>What the room wants next</h3>
-            </div>
-            <Bot size={18} />
-          </div>
-          <div className="opportunity-grid">
-            {topOpportunities.length > 0 ? (
-              topOpportunities.map((card) => {
-                const action = card.action
-                return (
-                  <div key={card.id} className={`opportunity-card tone-${card.tone}`}>
-                    <div className="opportunity-card__topline">
-                      <strong>{card.title}</strong>
-                      <span>{card.id}</span>
-                    </div>
-                    <p>{card.detail}</p>
-                    <div className="opportunity-card__suggestion">{card.suggestion}</div>
-                    {action ? (
+              <article className="context-card">
+                <div className="context-card__header">
+                  <div>
+                    <p className="context-card__eyebrow">Paper engine</p>
+                    <strong>{money(payload?.paper?.portfolio?.equity)}</strong>
+                  </div>
+                  <Bot size={16} />
+                </div>
+                <div className="context-metric-grid">
+                  <div className="context-metric">
+                    <span>Running</span>
+                    <strong>{paperRunning ? 'yes' : 'no'}</strong>
+                  </div>
+                  <div className="context-metric">
+                    <span>Return</span>
+                    <strong>{percent(equitySummary?.return_pct)}</strong>
+                  </div>
+                  <div className="context-metric">
+                    <span>Baseline</span>
+                    <strong>{percent(baselineSummary?.return_pct)}</strong>
+                  </div>
+                  <div className="context-metric">
+                    <span>Positions</span>
+                    <strong>{paperPositions.length}</strong>
+                  </div>
+                </div>
+                <div className="position-stack">
+                  {paperPositions.length > 0 ? (
+                    paperPositions.map((position) => (
+                      <div key={`${position.symbol}-${position.direction}`} className="position-pill">
+                        <div>
+                          <strong>{position.symbol}</strong>
+                          <span>{position.direction || '--'}</span>
+                        </div>
+                        <span>{money(position.notional)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="empty-state">No paper exposure is open.</div>
+                  )}
+                </div>
+                <div className="mini-actions">
+                  {paperActions.map((action) => {
+                    const key = actionKey('paper', action)
+                    return (
                       <button
-                        className="action-button"
-                        disabled={pendingAction === card.id}
-                        onClick={() => void runSuggestedAction(card.id, action)}
+                        key={key}
+                        className="thread-action thread-action--compact"
+                        disabled={pendingControl === key}
                         type="button"
+                        onClick={() => void runControl('paper', action)}
                       >
-                        <span>
-                          {pendingAction === card.id
-                            ? 'Sending...'
-                            : card.actionLabel || 'Run action'}
-                        </span>
-                        <ArrowRight size={16} />
+                        {pendingControl === key ? 'Sending...' : actionLabel(action)}
                       </button>
-                    ) : (
-                      <div className="monitor-note">No automatic intervention suggested.</div>
-                    )}
-                  </div>
-                )
-              })
-            ) : (
-              <div className="empty-state">No experiment inventory is available yet.</div>
-            )}
-          </div>
-        </article>
+                    )
+                  })}
+                </div>
+              </article>
 
-        <article className="panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Room geometry</p>
-              <h3>Where the threads are clustering</h3>
+              <article className="context-card">
+                <div className="context-card__header">
+                  <div>
+                    <p className="context-card__eyebrow">Research scoreboard</p>
+                    <strong>{researchSummary?.best_commit || '--'}</strong>
+                  </div>
+                  <BarChart3 size={16} />
+                </div>
+                <div className="context-metric-grid">
+                  <div className="context-metric">
+                    <span>Validation runs</span>
+                    <strong>{researchSummary?.total_runs ?? 0}</strong>
+                  </div>
+                  <div className="context-metric">
+                    <span>Best bpb</span>
+                    <strong>{decimal(researchSummary?.best_val_bpb)}</strong>
+                  </div>
+                  <div className="context-metric">
+                    <span>Trading score</span>
+                    <strong>{decimal(tradingSummary?.best_score)}</strong>
+                  </div>
+                  <div className="context-metric">
+                    <span>Trading set</span>
+                    <strong>{tradingSummary?.total_experiments ?? 0}</strong>
+                  </div>
+                </div>
+              </article>
+
+              <article className="context-card">
+                <div className="context-card__header">
+                  <div>
+                    <p className="context-card__eyebrow">Selected thread</p>
+                    <strong>{selectedThread?.id || 'No thread selected'}</strong>
+                  </div>
+                  <Radar size={16} />
+                </div>
+                {selectedThread ? (
+                  <>
+                    <p className="context-card__detail">
+                      {selectedThread.hypothesis || selectedThread.objective || selectedThread.search_space || 'No hypothesis text is available.'}
+                    </p>
+                    <div className="context-chip-row">
+                      <span className="context-chip">state {selectedThread.state || '--'}</span>
+                      <span className="context-chip">phase {selectedThread.phase || '--'}</span>
+                      <span className="context-chip">score {decimal(scoreOf(selectedThread))}</span>
+                    </div>
+                    <div className="context-rows">
+                      <div className="context-row">
+                        <span>Search space</span>
+                        <strong>{selectedThread.search_space || '--'}</strong>
+                      </div>
+                      <div className="context-row">
+                        <span>Last decision</span>
+                        <strong>
+                          {selectedThread.last_decision?.status || '--'}
+                          {selectedThread.last_decision?.reason ? ` · ${selectedThread.last_decision.reason}` : ''}
+                        </strong>
+                      </div>
+                      <div className="context-row">
+                        <span>Exit code</span>
+                        <strong>{selectedThread.last_exit_code ?? '--'}</strong>
+                      </div>
+                      <div className="context-row">
+                        <span>Runtime</span>
+                        <strong>{decimal(selectedThread.cycle_runtime_seconds, 1)}s</strong>
+                      </div>
+                      <div className="context-row">
+                        <span>Started</span>
+                        <strong>{shortClock(selectedThread.last_started_at)}</strong>
+                      </div>
+                      <div className="context-row">
+                        <span>Completed</span>
+                        <strong>{shortClock(selectedThread.last_completed_at)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="verification-stack">
+                      <div className="verification-card">
+                        <span>Verification gates</span>
+                        <strong>{compactList(selectedThread.last_verification?.failed_gates, 2)}</strong>
+                      </div>
+                      <div className="verification-card">
+                        <span>Command</span>
+                        <strong>{compactCommand(selectedThread.command)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="mini-actions">
+                      {selectedThreadActions.map((action) => {
+                        const key = actionKey('experiment', action, selectedThread.id)
+                        return (
+                          <button
+                            key={key}
+                            className="thread-action thread-action--compact"
+                            disabled={pendingControl === key || !selectedThread.id}
+                            type="button"
+                            onClick={() => {
+                              if (!selectedThread.id) return
+                              void runControl('experiment', action, selectedThread.id)
+                            }}
+                          >
+                            {pendingControl === key ? 'Sending...' : actionLabel(action)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <div className="empty-state">
+                    Select a thread to inspect its plan and verification state.
+                  </div>
+                )}
+              </article>
+
+              <article className="context-card">
+                <div className="context-card__header">
+                  <div>
+                    <p className="context-card__eyebrow">Operator prompts</p>
+                    <strong>Native dashboard actions worth preserving</strong>
+                  </div>
+                  <Flame size={16} />
+                </div>
+                <div className="prompt-stack">
+                  {recentActions.length > 0 ? (
+                    recentActions.map((item, index) => (
+                      <div key={`${item.title || 'action'}-${index}`} className="prompt-card">
+                        <strong>{item.title || 'Untitled action'}</strong>
+                        <p>{item.detail || 'No detail provided.'}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="empty-state">No action prompts have been emitted yet.</div>
+                  )}
+                </div>
+              </article>
             </div>
-            <Orbit size={18} />
-          </div>
-          <div className="phase-stack">
-            {phases.length > 0 ? (
-              phases.map(([phase, count]) => (
-                <div key={phase} className="phase-row">
-                  <div className="phase-row__meta">
-                    <strong>{phase}</strong>
-                    <span>{count} threads</span>
-                  </div>
-                  <div className="phase-row__bar">
-                    <span style={{ width: `${Math.max(14, count * 11)}%` }} />
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="empty-state">No phase data has been written yet.</div>
-            )}
-          </div>
+          </aside>
+        </div>
 
-          <div className="decision-grid">
-            {decisions.length > 0 ? (
-              decisions.map(([decision, count]) => (
-                <div key={decision} className="decision-tile">
-                  <span>{decision}</span>
-                  <strong>{count}</strong>
-                </div>
-              ))
-            ) : (
-              <div className="empty-state">Decision counts will populate after the first completed cycles.</div>
-            )}
+        <section className="timeline-tail">
+          <div className="timeline-tail__card">
+            <span>Generated</span>
+            <strong>{stamp(payload?.meta?.generated_at)}</strong>
           </div>
-        </article>
-
-        <article className="panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Operator prompts</p>
-              <h3>Native dashboard actions worth preserving</h3>
-            </div>
-            <Activity size={18} />
+          <div className="timeline-tail__card">
+            <span>Manager</span>
+            <strong>{managerState}</strong>
           </div>
-          <div className="prompt-stack">
-            {leadActions.length > 0 ? (
-              leadActions.map((item, index) => (
-                <div key={`${item.title}-${index}`} className="prompt-card">
-                  <strong>{item.title || 'Untitled action'}</strong>
-                  <p>{item.detail || 'No detail provided.'}</p>
-                </div>
-              ))
-            ) : (
-              <div className="empty-state">The base dashboard has not emitted any action prompts yet.</div>
-            )}
+          <div className="timeline-tail__card">
+            <span>Prompt spec</span>
+            <strong>{payload?.meta?.strategy_spec ? 'loaded' : 'unavailable'}</strong>
           </div>
-        </article>
-
-        <article className="panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Recent signal</p>
-              <h3>Event stream with semantic weight</h3>
-            </div>
-            <Flame size={18} />
-          </div>
-          <div className="event-stack">
-            {events.length > 0 ? (
-              events.slice(0, 6).map((event, index) => (
-                <div key={`${event.timestamp}-${index}`} className={`event-card tone-${eventTone(event)}`}>
-                  <div className="event-card__topline">
-                    <strong>{event.type || 'event'}</strong>
-                    <span>{stamp(event.timestamp)}</span>
-                  </div>
-                  <div className="event-card__body">
-                    <span>{event.experiment_id || 'manager'}</span>
-                    <span>{event.payload?.phase || event.payload?.phase_detail || '--'}</span>
-                    <span>{event.payload?.decision?.status || event.payload?.health || '--'}</span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="empty-state">No manager events are available yet.</div>
-            )}
-          </div>
-        </article>
-
-        <article className="panel panel--wide">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Thread tape</p>
-              <h3>All experiments, re-ranked by the current lens</h3>
-            </div>
-            <Radar size={18} />
-          </div>
-          <div className="thread-tape">
-            {sortExperiments(experiments, deferredLens).map((experiment, index) => {
-              const score = scoreOf(experiment)
-              return (
-                <div
-                  key={experiment.id || `thread-${index}`}
-                  className={`thread-pill tone-${stateTone(experiment)}`}
-                >
-                  <div className="thread-pill__title">
-                    <strong>{experiment.id || 'unknown-thread'}</strong>
-                    <span>{experiment.phase || experiment.state || '--'}</span>
-                  </div>
-                  <div className="thread-pill__meta">
-                    <span>{experiment.search_space || 'search space unset'}</span>
-                    <span>score {decimal(score)}</span>
-                    <span>
-                      {experiment.last_decision?.status ||
-                        (experiment.degraded ? 'degraded' : experiment.health || '--')}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </article>
-      </section>
-
-      {error ? (
-        <section className="error-banner">
-          <TriangleAlert size={18} />
-          <span>{error}</span>
         </section>
-      ) : null}
+
+        {error ? (
+          <section className="error-banner">
+            <TriangleAlert size={18} />
+            <span>{error}</span>
+          </section>
+        ) : null}
+
+        {postmortemOpen ? (
+          <section className="modal-shell" role="dialog" aria-modal="true" aria-labelledby="postmortem-title">
+            <div className="modal-backdrop" onClick={() => setPostmortemOpen(false)} />
+            <article className="modal-card">
+              <div className="modal-card__header">
+                <div>
+                  <p className="eyebrow">Trade postmortem</p>
+                  <h2 id="postmortem-title">Turn the latest outcome into a reusable rule.</h2>
+                </div>
+                <button
+                  className="rail-button rail-button--ghost"
+                  type="button"
+                  onClick={() => setPostmortemOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+
+              <p className="modal-card__lede">
+                This is the calm review surface. Capture the driver, what worked, what failed,
+                and the guardrail that prevents the same mistake from repeating.
+              </p>
+
+              <div className="modal-grid">
+                <section className="modal-panel">
+                  <div className="modal-panel__group">
+                    <label className="modal-label" htmlFor="postmortem-driver">
+                      Primary driver
+                    </label>
+                    <select
+                      id="postmortem-driver"
+                      className="modal-input"
+                      value={postmortemDriver}
+                      onChange={(event) => setPostmortemDriver(event.target.value as PostmortemDriver)}
+                    >
+                      {postmortemDrivers.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="modal-panel__group">
+                    <label className="modal-label" htmlFor="postmortem-worked">
+                      What worked
+                    </label>
+                    <textarea
+                      id="postmortem-worked"
+                      className="modal-input modal-input--area"
+                      value={postmortemWorked}
+                      onChange={(event) => setPostmortemWorked(event.target.value)}
+                      placeholder="Example: The room surfaced the degraded thread quickly, and the restart path was clear."
+                    />
+                  </div>
+
+                  <div className="modal-panel__group">
+                    <label className="modal-label" htmlFor="postmortem-failed">
+                      What failed
+                    </label>
+                    <textarea
+                      id="postmortem-failed"
+                      className="modal-input modal-input--area"
+                      value={postmortemFailed}
+                      onChange={(event) => setPostmortemFailed(event.target.value)}
+                      placeholder="Example: We acted before verifying whether the latest score drift came from stale state or a real regression."
+                    />
+                  </div>
+
+                  <div className="modal-panel__group">
+                    <label className="modal-label" htmlFor="postmortem-guardrail">
+                      New guardrail
+                    </label>
+                    <textarea
+                      id="postmortem-guardrail"
+                      className="modal-input modal-input--area"
+                      value={postmortemGuardrail}
+                      onChange={(event) => setPostmortemGuardrail(event.target.value)}
+                      placeholder="Example: Require one explicit verification command after every thread restart before trusting the room state."
+                    />
+                  </div>
+                </section>
+
+                <section className="modal-panel">
+                  <div className="modal-panel__header">
+                    <strong>Generated postmortem draft</strong>
+                    <span>Ready for docs/trade_postmortems.md</span>
+                  </div>
+                  <pre className="modal-pre">{postmortemMarkdown}</pre>
+                  <div className="mini-actions">
+                    <button
+                      className="rail-button"
+                      type="button"
+                      onClick={async () => {
+                        setPostmortemStatus('Saving the postmortem draft to docs/trade_postmortems.md...')
+                        try {
+                          const response = await fetch('/api/postmortem', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ markdown: postmortemMarkdown }),
+                          })
+                          const result = await readJsonResponse<{ ok?: boolean; error?: string; path?: string }>(
+                            response,
+                            '/api/postmortem',
+                          )
+                          if (!response.ok || !result.ok) {
+                            throw new Error(result.error || `HTTP ${response.status}`)
+                          }
+                          setPostmortemStatus(
+                            `Saved the postmortem draft to ${result.path || 'docs/trade_postmortems.md'}.`,
+                          )
+                        } catch (saveError) {
+                          const message =
+                            saveError instanceof Error ? saveError.message : 'Unknown error'
+                          setPostmortemStatus(
+                            `Save failed: ${message}. Use Copy draft as a fallback.`,
+                          )
+                        }
+                      }}
+                    >
+                      Save to repo
+                    </button>
+                    <button
+                      className="rail-button rail-button--ghost"
+                      type="button"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(postmortemMarkdown)
+                        setPostmortemStatus('Copied the postmortem draft to the clipboard.')
+                      }}
+                    >
+                      Copy draft
+                    </button>
+                    <button
+                      className="rail-button rail-button--ghost"
+                      type="button"
+                      onClick={() =>
+                        setPostmortemStatus(
+                          'Next step: append the draft to docs/trade_postmortems.md and encode the guardrail in docs or code.',
+                        )
+                      }
+                    >
+                      Show next step
+                    </button>
+                  </div>
+                  <div className="modal-status">{postmortemStatus}</div>
+                </section>
+              </div>
+            </article>
+          </section>
+        ) : null}
+      </section>
     </main>
   )
 }

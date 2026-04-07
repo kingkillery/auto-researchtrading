@@ -1,0 +1,20 @@
+app = "auto-research-trading-paper"
+primary_region = "ord"
+
+[env]
+  PORT = "8080"
+  STATE_PATH = "/data/paper-state.json"
+  STRATEGY_SPEC = "strategy:Strategy"
+  WORKBENCH_AUTH_REQUIRED = "1"
+  WORKBENCH_AUTH_REALM = "Auto Research Trading Workbench"
+
+[[mounts]]
+  source = "paper-state"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = "off"
+  min_machines_running = 1

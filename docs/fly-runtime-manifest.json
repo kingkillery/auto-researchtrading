@@ -1,0 +1,22 @@
+{
+  "required_files": [
+    "assets/logo.png",
+    "dashboard_template.html",
+    "docs/jupiter_experiment_threads.json",
+    "artifacts/dashboard-generative-ui/bundle.html"
+  ],
+  "optional_files": [
+    "autoresearch-results.tsv",
+    "equity_curve.csv",
+    "equity_curve_baseline.csv",
+    "results.tsv"
+  ],
+  "required_directories": [
+    "benchmarks"
+  ],
+  "root_python_entrypoints": true,
+  "required_root_scripts": [
+    "experiment_manager.py",
+    "run_jupiter_live.py"
+  ]
+}

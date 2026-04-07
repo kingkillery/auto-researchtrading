@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 from paper_engine import PaperTradingEngine
 from paper_state import JsonStateStore, _jsonable, default_state_path
 from paper_trade import load_strategy
+from workbench_auth import WorkbenchAuth, load_auth_config_from_env
 
 
 HOST = "0.0.0.0"
@@ -31,6 +32,7 @@ RESULTS_PATH = ROOT / "results.tsv"
 RESEARCH_PATH = ROOT / "autoresearch-results.tsv"
 EQUITY_PATH = ROOT / "equity_curve.csv"
 BASELINE_PATH = ROOT / "equity_curve_baseline.csv"
+TRADE_POSTMORTEMS_PATH = ROOT / "docs" / "trade_postmortems.md"
 WORKBENCH_TEMPLATE_PATH = ROOT / "dashboard_template.html"
 GENERATIVE_ARTIFACT_PATH = ROOT / "artifacts" / "dashboard-generative-ui" / "bundle.html"
 WORKBENCH_ROOT = Path.home() / ".cache" / "autotrader" / "workbench"
@@ -45,6 +47,7 @@ WORKBENCH_EXPERIMENT_MANIFEST = Path(
     os.environ.get("WORKBENCH_EXPERIMENT_MANIFEST", str(ROOT / "docs" / "jupiter_experiment_threads.json"))
 ).expanduser()
 UV_COMMAND = os.environ.get("UV_COMMAND", "uv")
+AUTH = WorkbenchAuth(load_auth_config_from_env(dict(os.environ)))
 
 
 def build_engine() -> PaperTradingEngine:
@@ -219,6 +222,16 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
             raise
     if last_error is not None:
         raise last_error
+
+
+def append_markdown_entry(path: Path, markdown: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = ""
+    if path.exists():
+        existing = path.read_text(encoding="utf-8")
+        if existing and not existing.endswith("\n"):
+            existing += "\n"
+    path.write_text(f"{existing}{markdown.rstrip()}\n\n", encoding="utf-8")
 
 
 def safe_int(value: Any) -> int | None:
@@ -535,6 +548,8 @@ class WorkbenchSupervisor:
         self.experiment_events_path = self.root / "experiments-events.jsonl"
         self._lock = threading.RLock()
 
+        # Keep docs/fly-runtime-manifest.json in sync with any new repo-local scripts
+        # or ROOT-relative runtime files added here so Fly image inputs stay explicit.
         paper_command = [
             UV_COMMAND,
             "run",
@@ -843,14 +858,22 @@ class FlyPaperHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         route = urlparse(self.path).path
+        if route == "/healthz":
+            self._send_json(HTTPStatus.OK, self._health_payload())
+            return
+        if route == "/login":
+            self._handle_login_page()
+            return
+        if route == "/logout":
+            self._handle_logout()
+            return
+        if not self._ensure_authenticated():
+            return
         if route == "/":
             if self._prefers_html():
                 self._send_bytes(HTTPStatus.OK, DASHBOARD_HTML.encode("utf-8"), "text/html; charset=utf-8")
             else:
                 self._send_json(HTTPStatus.OK, self._health_payload())
-            return
-        if route == "/healthz":
-            self._send_json(HTTPStatus.OK, self._health_payload())
             return
         if route in {"/state", "/api/state"}:
             self._send_json(HTTPStatus.OK, self._state_payload())
@@ -874,6 +897,11 @@ class FlyPaperHandler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        if self.path == "/login":
+            self._handle_login_submit()
+            return
+        if not self._ensure_authenticated():
+            return
         if self.path == "/step":
             try:
                 payload = self._read_json()
@@ -917,6 +945,25 @@ class FlyPaperHandler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.OK, {"ok": True, "workbench": state})
             return
 
+        if self.path == "/api/postmortem":
+            try:
+                payload = self._read_json()
+                markdown = str(payload.get("markdown", "")).strip()
+                if not markdown:
+                    raise ValueError("markdown is required")
+                append_markdown_entry(TRADE_POSTMORTEMS_PATH, markdown)
+            except ValueError as exc:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)})
+                return
+            except Exception as exc:
+                self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": str(exc)})
+                return
+            self._send_json(
+                HTTPStatus.OK,
+                {"ok": True, "path": str(TRADE_POSTMORTEMS_PATH), "saved_at": utc_now()},
+            )
+            return
+
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
@@ -925,6 +972,87 @@ class FlyPaperHandler(BaseHTTPRequestHandler):
     def _prefers_html(self) -> bool:
         accept = self.headers.get("Accept", "")
         return "text/html" in accept or accept in {"", "*/*"}
+
+    def _request_is_secure(self) -> bool:
+        forwarded_proto = self.headers.get("X-Forwarded-Proto", "")
+        return forwarded_proto.lower() == "https"
+
+    def _current_user(self) -> dict[str, Any] | None:
+        return AUTH.current_user(self.headers.get("Cookie"))
+
+    def _ensure_authenticated(self) -> bool:
+        if not AUTH.enabled:
+            return True
+        if self._current_user() is not None:
+            return True
+        expects_json = self.path.startswith("/api/") or self.path in {"/state", "/step"}
+        if not expects_json and self._prefers_html():
+            next_path = AUTH.redirect_location(self.path)
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", f"/login?next={next_path}")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return False
+        self._send_json(
+            HTTPStatus.UNAUTHORIZED,
+            {"error": "authentication_required"},
+            extra_headers={"WWW-Authenticate": f'Form realm="{AUTH.config.realm}"'},
+        )
+        return False
+
+    def _handle_login_page(self) -> None:
+        if not AUTH.enabled:
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "/")
+            self.end_headers()
+            return
+        if self._current_user() is not None:
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "/")
+            self.end_headers()
+            return
+        next_values = WorkbenchAuth.parse_form_body(urlparse(self.path).query.encode("utf-8"))
+        next_path = AUTH.sanitize_next_path(next_values.get("next"))
+        html_body = AUTH.login_html(next_path=next_path)
+        self._send_bytes(HTTPStatus.OK, html_body.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _handle_login_submit(self) -> None:
+        if not AUTH.enabled:
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "/")
+            self.end_headers()
+            return
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            content_length = 0
+        body = self.rfile.read(max(0, min(content_length, 4096))) if content_length > 0 else b""
+        form = WorkbenchAuth.parse_form_body(body)
+        username = form.get("username", "")
+        password = form.get("password", "")
+        next_path = AUTH.sanitize_next_path(form.get("next"))
+        if AUTH.authenticate_credentials(username, password):
+            session_cookie = AUTH.build_session_cookie(username, secure=self._request_is_secure())
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", next_path)
+            self.send_header("Set-Cookie", session_cookie)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+        html_body = AUTH.login_html(next_path=next_path, error_message="Invalid username or password.")
+        self._send_bytes(HTTPStatus.UNAUTHORIZED, html_body.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _handle_logout(self) -> None:
+        if not AUTH.enabled:
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "/")
+            self.end_headers()
+            return
+        self.send_response(HTTPStatus.SEE_OTHER)
+        self.send_header("Location", "/login")
+        self.send_header("Set-Cookie", AUTH.clear_session_cookie(secure=self._request_is_secure()))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
 
     def _health_payload(self) -> dict[str, Any]:
         with ENGINE_LOCK:
@@ -959,14 +1087,34 @@ class FlyPaperHandler(BaseHTTPRequestHandler):
             raise ValueError("request body must be a JSON object")
         return payload
 
-    def _send_json(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
-        self._send_bytes(status, json.dumps(_jsonable(payload), sort_keys=True).encode("utf-8"), "application/json")
+    def _send_json(
+        self,
+        status: HTTPStatus,
+        payload: dict[str, Any],
+        *,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
+        self._send_bytes(
+            status,
+            json.dumps(_jsonable(payload), sort_keys=True).encode("utf-8"),
+            "application/json",
+            extra_headers=extra_headers,
+        )
 
-    def _send_bytes(self, status: HTTPStatus, body: bytes, content_type: str) -> None:
+    def _send_bytes(
+        self,
+        status: HTTPStatus,
+        body: bytes,
+        content_type: str,
+        *,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        for header_name, header_value in (extra_headers or {}).items():
+            self.send_header(header_name, header_value)
         self.end_headers()
         self.wfile.write(body)
 
