@@ -146,7 +146,8 @@ uv run python workbench_ctl.py list-experiments
 
 Important:
 
-- `workbench_ctl.py` talks to `http://127.0.0.1:8080` by default. If that server is down, control commands fail with connection refused.
+- `workbench_ctl.py` auto-discovers the current local port from `~/.cache/autotrader/workbench/workbench.lock.json` when `--base-url` is omitted.
+- Local `fly_entrypoint.py` runs should stay on `http://127.0.0.1:8080` unless `WORKBENCH_PORT` is set explicitly.
 - `fly_entrypoint.py` is the launcher. `workbench_ctl.py` does not start the dashboard by itself.
 
 ### Recover a stale workbench runtime

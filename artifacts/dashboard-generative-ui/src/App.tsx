@@ -444,6 +444,7 @@ function App() {
   const [postmortemFailed, setPostmortemFailed] = useState('')
   const [postmortemGuardrail, setPostmortemGuardrail] = useState('')
   const [postmortemStatus, setPostmortemStatus] = useState('Capture the outcome while the room is still fresh.')
+  const [postmortemSaved, setPostmortemSaved] = useState(false)
 
   const deferredCapability = useDeferredValue(selectedCapability)
   const embedded = window.self !== window.top
@@ -623,6 +624,10 @@ function App() {
     selectedThread,
     summary.leader_id,
   ])
+
+  useEffect(() => {
+    setPostmortemSaved(false)
+  }, [postmortemMarkdown])
 
   return (
     <main className={`workspace ${embedded ? 'workspace--embedded' : ''}`}>
@@ -1251,6 +1256,7 @@ function App() {
                   <div className="mini-actions">
                     <button
                       className="rail-button"
+                      disabled={postmortemSaved}
                       type="button"
                       onClick={async () => {
                         setPostmortemStatus('Saving the postmortem draft to docs/trade_postmortems.md...')
@@ -1260,26 +1266,28 @@ function App() {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ markdown: postmortemMarkdown }),
                           })
-                          const result = await readJsonResponse<{ ok?: boolean; error?: string; path?: string }>(
+                          const result = await readJsonResponse<{ ok?: boolean; error?: string; path?: string; duplicate?: boolean }>(
                             response,
                             '/api/postmortem',
                           )
                           if (!response.ok || !result.ok) {
                             throw new Error(result.error || `HTTP ${response.status}`)
                           }
-                          setPostmortemStatus(
-                            `Saved the postmortem draft to ${result.path || 'docs/trade_postmortems.md'}.`,
-                          )
+                          setPostmortemSaved(true)
+                          setPostmortemStatus(result.duplicate
+                            ? `This postmortem draft already matches the latest entry in ${result.path || 'docs/trade_postmortems.md'}.`
+                            : `Saved the postmortem draft to ${result.path || 'docs/trade_postmortems.md'}.`)
                         } catch (saveError) {
                           const message =
                             saveError instanceof Error ? saveError.message : 'Unknown error'
                           setPostmortemStatus(
                             `Save failed: ${message}. Use Copy draft as a fallback.`,
                           )
+                          setPostmortemSaved(false)
                         }
                       }}
                     >
-                      Save to repo
+                      {postmortemSaved ? 'Saved' : 'Save to repo'}
                     </button>
                     <button
                       className="rail-button rail-button--ghost"

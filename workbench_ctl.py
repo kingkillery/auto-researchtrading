@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 from urllib import error, request
+
+WORKBENCH_ROOT = Path.home() / ".cache" / "autotrader" / "workbench"
+WORKBENCH_LOCK_PATH = WORKBENCH_ROOT / "workbench.lock.json"
 
 
 def fetch_json(url: str, method: str = "GET", payload: dict | None = None) -> dict:
@@ -14,6 +18,17 @@ def fetch_json(url: str, method: str = "GET", payload: dict | None = None) -> di
     req = request.Request(url, data=body, headers=headers, method=method)
     with request.urlopen(req, timeout=10) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def default_base_url() -> str:
+    if WORKBENCH_LOCK_PATH.exists():
+        try:
+            payload = json.loads(WORKBENCH_LOCK_PATH.read_text(encoding="utf-8"))
+            port = int(payload.get("port", 8080))
+            return f"http://127.0.0.1:{port}"
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            pass
+    return "http://127.0.0.1:8080"
 
 
 def action_target(action: str) -> tuple[str, str]:
@@ -53,7 +68,7 @@ def main() -> int:
         "stop-experiment",
     ])
     parser.add_argument("experiment_id_arg", nargs="?", default=None, help="Experiment id for experiment-scoped actions")
-    parser.add_argument("--base-url", default="http://127.0.0.1:8080", help="Workbench base URL")
+    parser.add_argument("--base-url", default=default_base_url(), help="Workbench base URL")
     parser.add_argument("--experiment-id", default=None, help="Experiment id for experiment-scoped actions")
     args = parser.parse_args()
     experiment_id = args.experiment_id_arg or args.experiment_id

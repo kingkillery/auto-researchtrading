@@ -22,7 +22,20 @@ from workbench_auth import WorkbenchAuth, load_auth_config_from_env
 
 
 HOST = "0.0.0.0"
-PORT = int(os.environ.get("PORT", "8080"))
+
+
+def resolve_port(env: dict[str, str]) -> int:
+    if env.get("WORKBENCH_PORT"):
+        return int(env["WORKBENCH_PORT"])
+    # In hosted Fly/runtime environments, PORT is the platform contract.
+    if env.get("FLY_APP_NAME") or env.get("FLY_ALLOC_ID") or env.get("FLY_MACHINE_ID"):
+        return int(env.get("PORT", "8080"))
+    # For local operator runs, ignore any unrelated ambient PORT and keep the
+    # workbench on its stable default unless explicitly overridden.
+    return 8080
+
+
+PORT = resolve_port(dict(os.environ))
 STRATEGY_SPEC = os.environ.get("STRATEGY_SPEC", "strategy:Strategy")
 STATE_PATH = Path(os.environ.get("STATE_PATH", default_state_path(STRATEGY_SPEC))).expanduser()
 RESET_STATE = os.environ.get("RESET_STATE", "").lower() in {"1", "true", "yes", "on"}
@@ -232,6 +245,18 @@ def append_markdown_entry(path: Path, markdown: str) -> None:
         if existing and not existing.endswith("\n"):
             existing += "\n"
     path.write_text(f"{existing}{markdown.rstrip()}\n\n", encoding="utf-8")
+
+
+def last_markdown_entry(path: Path) -> str:
+    if not path.exists():
+        return ""
+    content = path.read_text(encoding="utf-8").strip()
+    if not content:
+        return ""
+    parts = content.split("\n\n## ")
+    if len(parts) == 1:
+        return content
+    return f"## {parts[-1]}".strip()
 
 
 def safe_int(value: Any) -> int | None:
@@ -951,7 +976,9 @@ class FlyPaperHandler(BaseHTTPRequestHandler):
                 markdown = str(payload.get("markdown", "")).strip()
                 if not markdown:
                     raise ValueError("markdown is required")
-                append_markdown_entry(TRADE_POSTMORTEMS_PATH, markdown)
+                duplicate = last_markdown_entry(TRADE_POSTMORTEMS_PATH) == markdown
+                if not duplicate:
+                    append_markdown_entry(TRADE_POSTMORTEMS_PATH, markdown)
             except ValueError as exc:
                 self._send_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)})
                 return
@@ -960,7 +987,12 @@ class FlyPaperHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(
                 HTTPStatus.OK,
-                {"ok": True, "path": str(TRADE_POSTMORTEMS_PATH), "saved_at": utc_now()},
+                {
+                    "ok": True,
+                    "path": str(TRADE_POSTMORTEMS_PATH),
+                    "saved_at": utc_now(),
+                    "duplicate": duplicate,
+                },
             )
             return
 

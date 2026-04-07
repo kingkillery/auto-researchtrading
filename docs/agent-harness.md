@@ -36,6 +36,8 @@ This repo is a backtest-first trading research harness. The goal for agents is t
 
 There is still no always-on in-repo deployment target. The Jupiter live runner is an operator-invoked process, not a resident trading daemon.
 
+For local operator runs, the workbench should stay on `127.0.0.1:8080` unless `WORKBENCH_PORT` is set explicitly. Ambient `PORT` values from unrelated shells should not move the local control plane.
+
 ## Env Contract
 
 - Python 3.10+.
