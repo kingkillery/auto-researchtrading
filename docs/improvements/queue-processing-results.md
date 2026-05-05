@@ -166,3 +166,40 @@ Found in:
 - `artifacts/research_full_horizon/summary.json`
 - `artifacts/research_full_horizon/leaderboard.csv`
 - `artifacts/research_full_horizon/cost_stress.csv`
+
+## 2026-05-05T07:20:14Z — Sub-agent follow-up: regime_switching full-horizon completion
+
+- Full-horizon artifact: `artifacts/research_full_horizon/summary.json`
+- Profile: `regime_switching`
+- Full-horizon current score: **14.133141** (`100.00%` coverage)
+- Cost stress: `x2 = 10.930968`, `x3 = 6.865714`
+- Benchmark outcome: current strategy remains ahead of all listed benchmarks on this run.
+- Time-capped vs full-horizon note: prior val/time-capped reference in watcher log for nearby profiles was ~15.5, while this completed full-horizon `regime_switching` run is **14.13**, so full-horizon remains strong but below the `>15` L5-review threshold.
+- Alert: paper feed PID `90920` not running at poll time.
+- Alert: workbench dashboard PID `103440` not running at poll time.
+- Routing flag: score is `>= 10` and `< 15`, so **no L5 escalation** and **no <10 re-evaluation trigger** from the completion rule.
+
+
+---
+
+## BB_COMPRESSION_PERCENTILE Validation: 18 vs 40 (2026-05-05)
+
+**Profile:** default  
+**Split:** val  
+**Budget:** 120s (time-capped)
+
+| Metric | BB=40 (baseline) | BB=18 | Delta |
+|--------|-----------------|-------|-------|
+| Score | 15.53 | 15.49 | -0.04 (-0.3%) |
+| Return% | 20.94 | 23.12 | +2.18 (+10.4%) |
+| Trades | 2717 | 2716 | -1 (0%) |
+| WinRate% | 72.75 | 72.52 | -0.23pp |
+| ProfitFactor | 7.77 | 7.95 | +0.18 |
+| MaxDD% | 0.33 | 0.32 | -0.01 |
+
+### Verdict
+
+- **Difference is negligible** for the default profile. Score delta (-0.04) is within time-capped noise.
+- BB=18 produces marginally higher return (+10.4%) but lower score due to slight Sharpe degradation.
+- **Recommendation:** Keep BB=40 as the conservative default. BB=18 can be tested profile-by-profile if a specific experiment wants a stricter compression gate.
+- **No global change warranted.**
