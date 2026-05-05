@@ -6,25 +6,42 @@
 
 ---
 
-## Issue #1: Paper feed runs wrong profile (paper_probe BTC) while winner is trend_following SOL
+## Issue #1: ~~Paper feed profile mismatch~~ → RESOLVED (stale info)
 
-**Priority:** High  
+**Status:** ✅ FIXED — Feed already running `trend_following` SOL  
 **Type:** Operational
 
-### Problem
-The live paper feed is running `paper_probe` (BTC-only mean-reversion scalper) and producing zero fills. The current winning experiment is `perps-trend-follow` (`trend_following` profile, SOL-only, best score 18.94).
+### What changed
+The paper feed was already switched to `trend_following` on SOL. State file `strategy_Strategy_trend_following.json` exists (361 KB) and is being updated. Warmup completed (500 timestamps / 1,500 bars). Fills are being produced.
 
-### Root cause
-The infrastructure for profile switching exists (`WORKBENCH_PAPER_PROFILE` env var, profile-specific state files), but the live feed hasn't been configured to use the winning profile.
+### Current status
 
-### Fix options
-1. **Probe mode**: Launch with `STRATEGY_SPEC=strategy_probe:StrategyProbe` for explicit fill-testing
-2. **Winner mode**: Set `WORKBENCH_PAPER_PROFILE=trend_following` and `WORKBENCH_SYMBOLS=SOL` before launching `fly_entrypoint.py`
+Latest check, 2026-05-05T00:28:42-06:00:
+- **Profile:** `trend_following`
+- **Symbols:** `SOL`
+- **State file:** Exists
+- **Runtime:** Restarted with `uv run python workbench_ctl.py start-paper`
+- **Paper PnL:** **-$27.96** (-0.027962%) - negative and not a paper-profit claim
 
-### Acceptance criteria
-- [ ] Paper feed produces fills on the chosen profile
-- [ ] State file matches the profile name (e.g. `strategy_Strategy_trend_following.json`)
-- [ ] Dashboard shows correct `paper_profile`
+Follow-up, 2026-05-05T00:30:48-06:00:
+- **Runtime:** Still running
+- **Latest fill:** Opened `SOL` short exposure in paper mode
+- **Paper PnL:** **-$29.09** (-0.029094%) marked-to-market with open exposure - negative and not a paper-profit claim
+
+Superseded by leader-aligned run, 2026-05-05T00:33:03-06:00:
+- **Profile:** `regime_switching`
+- **Symbols:** `BTC ETH SOL`
+- **Warmup:** Seeded `500` timestamps / `1500` bars
+- **Paper PnL:** **$0.00** before live-feed paper fills - not a paper-profit claim
+
+Earlier snapshot:
+- **Profile:** `trend_following` ✅
+- **Symbols:** `SOL` ✅
+- **State file:** Exists and updating ✅
+- **Paper PnL:** **-$29.79** (-0.03%) — negative but early in feed
+
+### Remaining work
+- [ ] Monitor the leader-aligned feed for live-feed paper fills and sustained net-positive PnL before L5 evidence claim
 
 ---
 
@@ -122,3 +139,94 @@ If an operator sets `AUTOTRADER_EXPERIMENT_PROFILE=trend_following` for the expe
 ---
 
 *Generated: 2026-05-04*
+
+---
+
+## Issue #6: ~~Paper feed runs `trend_following` but experiment leader is `regime_switching`~~ -> RESOLVED
+
+**Status:** Fixed by leader-aligned managed paper feed on 2026-05-05T00:33:03-06:00  
+
+**Priority:** Medium  
+**Type:** Operational
+
+### Problem
+The experiment manager's current leader is `perps-regime-switch` (`regime_switching` profile, multi-asset `BTC ETH SOL`, score 20.44912). The live paper feed is running `trend_following` SOL. There is no auto-sync procedure.
+
+### Root cause
+No documented workflow connects the experiment leaderboard to the paper feed configuration. The operator must manually update `WORKBENCH_PAPER_PROFILE` and `WORKBENCH_SYMBOLS` when the leader changes.
+
+### Current status
+As of 2026-05-05T00:30:48-06:00, `uv run python workbench_ctl.py status` shows:
+
+- **Paper feed:** running, `trend_following`, `SOL`
+- **Experiment leader:** `perps-regime-switch`, `regime_switching`, `BTC ETH SOL`, score `20.44912`
+
+The paper feed is alive again, and the latest managed command is now leader-aligned:
+
+```text
+run_jupiter_live.py --execution-mode paper --symbols BTC ETH SOL --state C:\Users\prest\.cache\autotrader\paper\strategy_Strategy_regime_switching.json --paper-warmup-split val --paper-warmup-bars 500
+```
+
+Warmup seeded `500` timestamps / `1500` bars. Paper PnL is `0.00` before live-feed paper fills, so this resolves alignment but does not create a paper-profit claim.
+
+### Fix options
+1. **Manual sync**: Update env vars and restart paper feed
+2. **Auto-sync**: Enhance workbench to read `experiments-status.json` and auto-restart paper feed on leader change
+3. **Multi-feed**: Run multiple paper feeds in parallel (one per top-N experiment)
+
+### Acceptance criteria
+- [x] Paper feed profile matches experiment leader OR deviation is explicitly documented
+- [x] Symbols align with the leader's manifest
+
+---
+
+## Issue #7: `paper-feed.log` corruption — mixed SOL + stale BTC entries
+
+**Status:** ✅ FIXED  
+**Priority:** Medium  
+**Type:** Operational / Bug
+
+### Problem
+`~/.cache/autotrader/workbench/paper-feed.log` contained mixed output from multiple processes:
+- Lines 1–9: Current `trend_following` SOL feed (5-minute bars)
+- Lines 10–26: Stale BTC feed (1-minute bars) from a previous run
+
+### Fix applied
+- Archived corrupted log to `paper-feed-20260505-001943.log` (26 lines)
+- Truncated live log
+- No orphaned processes found running
+- `fly_entrypoint.py:543` already opens log with `"w"` mode (truncates on restart)
+
+### Future prevention
+- `fly_entrypoint.py` already kills existing paper feed before starting new one (WorkbenchSupervisor logic)
+- Consider adding timestamped log rotation if mixed-process risk increases
+
+### Acceptance criteria
+- [x] Log contains only the current feed process output
+- [x] Stale entries are archived, not interleaved
+
+---
+
+## Issue #8: Stale docs claim wrong active profile and symbols
+
+**Status:** Fixed for current docs; ongoing runtime mismatch remains tracked in Issue #6  
+**Priority:** Low  
+**Type:** Documentation
+
+### Problem
+Multiple docs contain stale or contradictory information:
+
+1. **`docs/improvements/profitability-evidence-loop/README.md`** previously described historical `liquidation_buffer` / `BTC ETH SOL` runs as current active state.
+2. **`docs/agent-harness.md:34`** describes default launcher behavior, not the current process environment.
+3. Runtime currently uses `trend_following` on `SOL`; this is documented in the evidence-loop README and the remaining operational mismatch is Issue #6.
+
+### Fix
+Update docs to match runtime, or update runtime to match docs. Either is acceptable but they must align.
+
+### Acceptance criteria
+- [x] All docs referencing the active paper feed match the actual runtime config
+- [x] `paper_profile` and `symbols` are consistent across README, agent-harness, and evidence-loop docs
+
+---
+
+*Updated: 2026-05-04*
