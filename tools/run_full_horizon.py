@@ -19,28 +19,23 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+# Parse args BEFORE importing backtest so the profile env var is set first
+parser = argparse.ArgumentParser(description="Run full-horizon backtest without time budget truncation.")
+parser.add_argument("--profile", default=None, help="AUTOTRADER_EXPERIMENT_PROFILE value")
+args = parser.parse_args()
+
+if args.profile:
+    os.environ["AUTOTRADER_EXPERIMENT_PROFILE"] = args.profile
+
 # Patch TIME_BUDGET before importing backtest
 import prepare
 
 original_budget = prepare.TIME_BUDGET
 prepare.TIME_BUDGET = 7200  # 2 hours — enough for full data
 
-from backtest import main as backtest_main
+print(f"TIME_BUDGET patched: {original_budget}s -> {prepare.TIME_BUDGET}s")
+print(f"Profile: {os.environ.get('AUTOTRADER_EXPERIMENT_PROFILE', 'default')}")
+print("Running full-horizon backtest...")
 
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Run full-horizon backtest without time budget truncation.")
-    parser.add_argument("--profile", default=None, help="AUTOTRADER_EXPERIMENT_PROFILE value")
-    args = parser.parse_args()
-
-    if args.profile:
-        os.environ["AUTOTRADER_EXPERIMENT_PROFILE"] = args.profile
-
-    print(f"TIME_BUDGET patched: {original_budget}s -> {prepare.TIME_BUDGET}s")
-    print("Running full-horizon backtest...")
-
-    return backtest_main()
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+# Importing backtest.py runs it (backtest.py has no main() function)
+import backtest
