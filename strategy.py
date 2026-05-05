@@ -12,6 +12,7 @@ The default path is a balanced six-signal ensemble:
 import os
 
 import numpy as np
+import pandas as pd
 from prepare import Signal, PortfolioState, BarData, INITIAL_CAPITAL
 
 ACTIVE_SYMBOLS = ["BTC", "ETH", "SOL"]
@@ -307,19 +308,18 @@ class Strategy:
         """Calculate current BB width percentile over lookback."""
         if len(closes) < period * 3:
             return 50.0
-        # Calculate rolling BB width
-        widths = []
-        for i in range(period * 2, len(closes)):
-            window = closes[i-period:i]
-            sma = np.mean(window)
-            std = np.std(window)
-            width = (2 * std) / sma if sma > 0 else 0
-            widths.append(width)
-        if len(widths) < 2:
+        s = pd.Series(closes)
+        rolling_mean = s.rolling(window=period).mean()
+        rolling_std = s.rolling(window=period).std()
+        widths = (2 * rolling_std / rolling_mean).values
+        # Match original indexing: original i ranges from period*2 to len(closes)-1
+        # Pandas rolling: widths[k] = window closes[k-period+1:k+1]
+        # We want k+1 = i, so k = i-1 -> first k = period*2 - 1, last k = len(closes)-2
+        valid_widths = widths[period * 2 - 1 : -1]
+        if len(valid_widths) < 2:
             return 50.0
-        current_width = widths[-1]
-        # Percentile of current width
-        pctile = 100 * np.sum(np.array(widths) <= current_width) / len(widths)
+        current_width = valid_widths[-1]
+        pctile = 100 * np.sum(valid_widths <= current_width) / len(valid_widths)
         return pctile
 
     def on_bar(self, bar_data, portfolio):
