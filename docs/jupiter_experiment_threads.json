@@ -6,7 +6,9 @@
     "symbols": ["SOL"],
     "paper_budget_usd": 10000,
     "split": "val",
-    "search_space": "trend_following"
+    "search_space": "trend_following",
+    "desired_state": "paused",
+    "focus_tier": "parked"
   },
   {
     "id": "perps-mean-revert",
@@ -15,7 +17,9 @@
     "symbols": ["SOL"],
     "paper_budget_usd": 10000,
     "split": "val",
-    "search_space": "mean_reversion"
+    "search_space": "mean_reversion",
+    "desired_state": "paused",
+    "focus_tier": "parked"
   },
   {
     "id": "perps-regime-switch",
@@ -24,7 +28,9 @@
     "symbols": ["BTC", "ETH", "SOL"],
     "paper_budget_usd": 15000,
     "split": "val",
-    "search_space": "regime_switching"
+    "search_space": "regime_switching",
+    "desired_state": "running",
+    "focus_tier": "primary"
   },
   {
     "id": "perps-borrow-decay",
@@ -33,7 +39,9 @@
     "symbols": ["BTC", "ETH", "SOL"],
     "paper_budget_usd": 12000,
     "split": "val",
-    "search_space": "carry_aware_exits"
+    "search_space": "carry_aware_exits",
+    "desired_state": "running",
+    "focus_tier": "secondary"
   },
   {
     "id": "perps-impact-aware-sizing",
@@ -42,7 +50,9 @@
     "symbols": ["BTC", "ETH", "SOL"],
     "paper_budget_usd": 12000,
     "split": "val",
-    "search_space": "impact_aware_sizing"
+    "search_space": "impact_aware_sizing",
+    "desired_state": "running",
+    "focus_tier": "secondary"
   },
   {
     "id": "perps-liquidation-buffer",
@@ -51,7 +61,9 @@
     "symbols": ["BTC", "ETH", "SOL"],
     "paper_budget_usd": 10000,
     "split": "val",
-    "search_space": "liquidation_buffer"
+    "search_space": "liquidation_buffer",
+    "desired_state": "running",
+    "focus_tier": "secondary"
   },
   {
     "id": "perps-limit-pullback",
@@ -60,7 +72,9 @@
     "symbols": ["SOL"],
     "paper_budget_usd": 10000,
     "split": "val",
-    "search_space": "limit_pullback"
+    "search_space": "limit_pullback",
+    "desired_state": "paused",
+    "focus_tier": "parked"
   },
   {
     "id": "perps-relative-strength",
@@ -69,7 +83,9 @@
     "symbols": ["BTC", "ETH", "SOL"],
     "paper_budget_usd": 15000,
     "split": "val",
-    "search_space": "relative_strength_rotation"
+    "search_space": "relative_strength_rotation",
+    "desired_state": "paused",
+    "focus_tier": "parked"
   },
   {
     "id": "perps-compression-breakout",
@@ -78,7 +94,9 @@
     "symbols": ["SOL"],
     "paper_budget_usd": 10000,
     "split": "val",
-    "search_space": "compression_breakout"
+    "search_space": "compression_breakout",
+    "desired_state": "running",
+    "focus_tier": "primary"
   },
   {
     "id": "perps-failure-reversal",
@@ -87,6 +105,8 @@
     "symbols": ["SOL"],
     "paper_budget_usd": 10000,
     "split": "val",
-    "search_space": "failure_reversal"
+    "search_space": "failure_reversal",
+    "desired_state": "paused",
+    "focus_tier": "parked"
   }
 ]

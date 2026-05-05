@@ -38,6 +38,14 @@ Leader-aligned fill check, 2026-05-05T00:36:11-06:00:
 - **Latest fills:** Opened `BTC` short, `ETH` long, and `SOL` short exposure in paper mode
 - **Paper PnL:** **-$6.42** (-0.006415%) marked-to-market with open exposure - negative and not a paper-profit claim
 
+Leader-aligned closed-cycle check, 2026-05-05T00:43:07-06:00:
+- **Latest fills:** Closed `BTC`, `ETH`, and `SOL`; no remaining exposure
+- **Paper PnL:** **-$13.31** (-0.013307%) closed/flat equity - negative and not a paper-profit claim
+
+Leader-aligned follow-up bar, 2026-05-05T00:47:42-06:00:
+- **Latest fills:** None
+- **Paper PnL:** **-$13.31** (-0.013307%) closed/flat equity - unchanged and not a paper-profit claim
+
 Earlier snapshot:
 - **Profile:** `trend_following` ✅
 - **Symbols:** `SOL` ✅
@@ -171,7 +179,7 @@ The paper feed is alive again, and the latest managed command is now leader-alig
 run_jupiter_live.py --execution-mode paper --symbols BTC ETH SOL --state C:\Users\prest\.cache\autotrader\paper\strategy_Strategy_regime_switching.json --paper-warmup-split val --paper-warmup-bars 500
 ```
 
-Warmup seeded `500` timestamps / `1500` bars. The first leader-aligned live-feed paper fill opened `BTC` short, `ETH` long, and `SOL` short exposure; paper PnL is `-6.42` marked-to-market, so this resolves alignment but does not create a paper-profit claim.
+Warmup seeded `500` timestamps / `1500` bars. The first leader-aligned live-feed paper cycle opened `BTC` short, `ETH` long, and `SOL` short exposure, then closed all exposure. Closed/flat paper PnL is `-13.31`, so this resolves alignment but does not create a paper-profit claim.
 
 ### Fix options
 1. **Manual sync**: Update env vars and restart paper feed

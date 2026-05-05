@@ -31,6 +31,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 10000,
         "split": "val",
         "search_space": "trend_following",
+        "desired_state": "paused",
+        "focus_tier": "parked",
     },
     {
         "id": "perps-mean-revert",
@@ -40,6 +42,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 10000,
         "split": "val",
         "search_space": "mean_reversion",
+        "desired_state": "paused",
+        "focus_tier": "parked",
     },
     {
         "id": "perps-regime-switch",
@@ -49,6 +53,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 15000,
         "split": "val",
         "search_space": "regime_switching",
+        "desired_state": "running",
+        "focus_tier": "primary",
     },
     {
         "id": "perps-borrow-decay",
@@ -58,6 +64,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 12000,
         "split": "val",
         "search_space": "carry_aware_exits",
+        "desired_state": "running",
+        "focus_tier": "secondary",
     },
     {
         "id": "perps-impact-aware-sizing",
@@ -67,6 +75,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 12000,
         "split": "val",
         "search_space": "impact_aware_sizing",
+        "desired_state": "running",
+        "focus_tier": "secondary",
     },
     {
         "id": "perps-liquidation-buffer",
@@ -76,6 +86,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 10000,
         "split": "val",
         "search_space": "liquidation_buffer",
+        "desired_state": "running",
+        "focus_tier": "secondary",
     },
     {
         "id": "perps-limit-pullback",
@@ -85,6 +97,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 10000,
         "split": "val",
         "search_space": "limit_pullback",
+        "desired_state": "paused",
+        "focus_tier": "parked",
     },
     {
         "id": "perps-relative-strength",
@@ -94,6 +108,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 15000,
         "split": "val",
         "search_space": "relative_strength_rotation",
+        "desired_state": "paused",
+        "focus_tier": "parked",
     },
     {
         "id": "perps-compression-breakout",
@@ -103,6 +119,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 10000,
         "split": "val",
         "search_space": "compression_breakout",
+        "desired_state": "running",
+        "focus_tier": "primary",
     },
     {
         "id": "perps-failure-reversal",
@@ -112,6 +130,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 10000,
         "split": "val",
         "search_space": "failure_reversal",
+        "desired_state": "paused",
+        "focus_tier": "parked",
     },
 ]
 
@@ -369,6 +389,7 @@ class ExperimentConfig:
     split: str
     paper_budget_usd: float
     search_space: str
+    desired_state: str
     max_drawdown_pct: float
     min_trades: int
     min_score_delta: float
@@ -427,6 +448,11 @@ class ExperimentManager:
             symbols = tuple(str(symbol).upper() for symbol in item.get("symbols", ["SOL"]))
             if not symbols:
                 raise ValueError(f"experiment {experiment_id} must declare at least one symbol")
+            desired_state = str(item.get("desired_state", "running")).strip().lower() or "running"
+            if desired_state not in {"running", "paused", "stopped"}:
+                raise ValueError(
+                    f"experiment {experiment_id} has invalid desired_state={desired_state!r}; expected running|paused|stopped"
+                )
             experiment_dir = base_dir / item["id"]
             configs.append(
                 ExperimentConfig(
@@ -437,6 +463,7 @@ class ExperimentManager:
                     split=str(item.get("split", "val")),
                     paper_budget_usd=float(item.get("paper_budget_usd", 10000)),
                     search_space=str(item.get("search_space", "unknown")),
+                    desired_state=desired_state,
                     max_drawdown_pct=float(item.get("max_drawdown_pct", 15.0)),
                     min_trades=int(item.get("min_trades", 20)),
                     min_score_delta=float(item.get("min_score_delta", 0.0)),
@@ -449,14 +476,22 @@ class ExperimentManager:
     def _default_control(self) -> dict[str, Any]:
         return {
             "manager": {"desired_state": "running"},
-            "experiments": {config.id: {"desired_state": "running", "restart_nonce": 0} for config in self._configs},
+            "experiments": {
+                config.id: {"desired_state": config.desired_state, "restart_nonce": 0}
+                for config in self._configs
+            },
         }
 
     def _default_experiment_state(self, config: ExperimentConfig) -> dict[str, Any]:
+        initial_state = "idle"
+        if config.desired_state == "paused":
+            initial_state = "paused"
+        elif config.desired_state == "stopped":
+            initial_state = "stopped"
         return {
             "id": config.id,
-            "state": "idle",
-            "desired_state": "running",
+            "state": initial_state,
+            "desired_state": config.desired_state,
             "iteration": 0,
             "hypothesis": config.hypothesis,
             "objective": config.objective,
@@ -754,7 +789,7 @@ class ExperimentManager:
         current = read_json(self.control_path, self._default_control())
         experiments = current.setdefault("experiments", {})
         for config in self._configs:
-            experiments.setdefault(config.id, {"desired_state": "running", "restart_nonce": 0})
+            experiments.setdefault(config.id, {"desired_state": config.desired_state, "restart_nonce": 0})
         current.setdefault("manager", {"desired_state": "running"})
         return current
 
