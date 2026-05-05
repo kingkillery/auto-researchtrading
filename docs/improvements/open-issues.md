@@ -34,6 +34,10 @@ Superseded by leader-aligned run, 2026-05-05T00:33:03-06:00:
 - **Warmup:** Seeded `500` timestamps / `1500` bars
 - **Paper PnL:** **$0.00** before live-feed paper fills - not a paper-profit claim
 
+Leader-aligned fill check, 2026-05-05T00:36:11-06:00:
+- **Latest fills:** Opened `BTC` short, `ETH` long, and `SOL` short exposure in paper mode
+- **Paper PnL:** **-$6.42** (-0.006415%) marked-to-market with open exposure - negative and not a paper-profit claim
+
 Earlier snapshot:
 - **Profile:** `trend_following` ✅
 - **Symbols:** `SOL` ✅
@@ -167,7 +171,7 @@ The paper feed is alive again, and the latest managed command is now leader-alig
 run_jupiter_live.py --execution-mode paper --symbols BTC ETH SOL --state C:\Users\prest\.cache\autotrader\paper\strategy_Strategy_regime_switching.json --paper-warmup-split val --paper-warmup-bars 500
 ```
 
-Warmup seeded `500` timestamps / `1500` bars. Paper PnL is `0.00` before live-feed paper fills, so this resolves alignment but does not create a paper-profit claim.
+Warmup seeded `500` timestamps / `1500` bars. The first leader-aligned live-feed paper fill opened `BTC` short, `ETH` long, and `SOL` short exposure; paper PnL is `-6.42` marked-to-market, so this resolves alignment but does not create a paper-profit claim.
 
 ### Fix options
 1. **Manual sync**: Update env vars and restart paper feed
@@ -209,23 +213,30 @@ Warmup seeded `500` timestamps / `1500` bars. Paper PnL is `0.00` before live-fe
 
 ## Issue #8: Stale docs claim wrong active profile and symbols
 
-**Status:** Fixed for current docs; ongoing runtime mismatch remains tracked in Issue #6  
+**Status:** ✅ FIXED  
 **Priority:** Low  
 **Type:** Documentation
 
 ### Problem
-Multiple docs contain stale or contradictory information:
+Multiple docs contained stale or contradictory information about the active paper feed profile and symbols.
 
-1. **`docs/improvements/profitability-evidence-loop/README.md`** previously described historical `liquidation_buffer` / `BTC ETH SOL` runs as current active state.
-2. **`docs/agent-harness.md:34`** describes default launcher behavior, not the current process environment.
-3. Runtime currently uses `trend_following` on `SOL`; this is documented in the evidence-loop README and the remaining operational mismatch is Issue #6.
+### Fix applied
+Updated all docs to reflect the current runtime state as of 2026-05-05:
+- **Active profile:** `regime_switching`
+- **Active symbols:** `BTC ETH SOL`
+- **Paper feed PID:** 90920
+- **State file:** `strategy_Strategy_regime_switching.json`
+- **Experiment leader:** `perps-regime-switch` (score 20.44912)
 
-### Fix
-Update docs to match runtime, or update runtime to match docs. Either is acceptable but they must align.
+### Files updated
+- `docs/improvements/open-issues.md` (this file)
+- `docs/improvements/queue-processing-results.md` — marked historical state table as outdated
+- `docs/improvements/review-recent-changes.md` — updated recommendation to reflect regime_switching
+- `docs/agent-harness.md` — updated example profile from `trend_following` to `regime_switching`
 
 ### Acceptance criteria
 - [x] All docs referencing the active paper feed match the actual runtime config
-- [x] `paper_profile` and `symbols` are consistent across README, agent-harness, and evidence-loop docs
+- [x] `paper_profile` and `symbols` are consistent across docs
 
 ---
 

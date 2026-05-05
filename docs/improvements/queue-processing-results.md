@@ -67,9 +67,11 @@ Found in:
 
 **Result:** Significant findings. See detailed audit below.
 
-### Current State (as of 2026-05-05 00:10 local)
+### Current State (as of 2026-05-05 00:10 local) — HISTORICAL
 
-| Item | Expected / Documented | Actual / Runtime |
+> ⚠️ **Outdated:** The paper feed was later switched to `regime_switching` on `BTC ETH SOL` to align with the experiment leader (see Issue #6).
+
+| Item | Expected / Documented | Actual / Runtime (at time of audit) |
 |------|----------------------|------------------|
 | **Profile** | `trend_following` | `trend_following` ✅ |
 | **Symbols** | `BTC ETH SOL` (per docs) | `SOL` only ⚠️ |

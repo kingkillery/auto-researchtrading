@@ -151,11 +151,15 @@ Two waves of changes are in the working tree:
 
 ## 3. Cross-Cutting Concerns
 
-### 3.1 Profile Mismatch Still Exists
+### 3.1 Profile Mismatch — RESOLVED
 
-The live paper feed configuration hasn't been updated to use the winning `trend_following` profile. The infrastructure now supports it (`WORKBENCH_PAPER_PROFILE`), but no one has flipped the switch.
+The live paper feed was switched from `trend_following` SOL to `regime_switching` BTC ETH SOL to align with the experiment leader (`perps-regime-switch`, score 20.44912).
 
-**To fix:** Set `WORKBENCH_PAPER_PROFILE=trend_following` and `WORKBENCH_SYMBOLS=SOL` for the live paper feed, or launch `run_jupiter_live.py` with `--strategy strategy:Strategy` and `AUTOTRADER_EXPERIMENT_PROFILE=trend_following`.
+**Current config:**
+- `WORKBENCH_PAPER_PROFILE=regime_switching`
+- `WORKBENCH_SYMBOLS=BTC ETH SOL`
+- State file: `strategy_Strategy_regime_switching.json`
+- Paper feed PID: 90920
 
 ### 3.2 Time-Capped Backtests
 
