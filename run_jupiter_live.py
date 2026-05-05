@@ -25,6 +25,7 @@ from jupiter_execution import (
 from jupiter_live_adapter import JupiterLiveMarketFeed, JupiterPublicMarketDataClient
 from paper_engine import PaperTradingEngine
 from paper_state import JsonStateStore, default_state_path
+from prepare import load_data
 
 
 LIVE_STATE_ROOT = Path.home() / ".cache" / "autotrader" / "live"
@@ -102,6 +103,72 @@ def _default_order_request_path(state_path: Path) -> Path:
 def process_paper_bar(engine: PaperTradingEngine, bar_snapshot: dict[str, dict[str, Any]]) -> None:
     result = engine.step(bar_snapshot)
     emit_paper_bar(result, bar_snapshot)
+
+
+def warmup_paper_history(
+    engine: PaperTradingEngine,
+    *,
+    split: str,
+    symbols: list[str],
+    limit: int,
+) -> dict[str, Any]:
+    data = load_data(split)
+    requested = {symbol.upper() for symbol in symbols}
+    indexed = {
+        symbol: frame.set_index("timestamp").sort_index()
+        for symbol, frame in data.items()
+        if symbol.upper() in requested
+    }
+    if not indexed:
+        return {
+            "type": "paper_warmup",
+            "split": split,
+            "requested_symbols": sorted(requested),
+            "seeded_timestamps": 0,
+            "seeded_bars": 0,
+            "latest_timestamp": None,
+        }
+
+    timestamps = sorted({timestamp for frame in indexed.values() for timestamp in frame.index.tolist()})
+    if limit > 0:
+        timestamps = timestamps[-limit:]
+
+    seeded_timestamps = 0
+    seeded_bars = 0
+    latest_timestamp = None
+    for timestamp in timestamps:
+        snapshot: dict[str, dict[str, Any]] = {}
+        for symbol, frame in indexed.items():
+            if timestamp not in frame.index:
+                continue
+            row = frame.loc[timestamp]
+            if getattr(row, "ndim", 1) > 1:
+                row = row.iloc[0]
+            if hasattr(row, "to_dict"):
+                payload = dict(row.to_dict())
+            else:
+                payload = dict(row)
+            payload.setdefault("timestamp", int(timestamp))
+            snapshot[symbol] = payload
+
+        if not snapshot:
+            continue
+
+        count = engine.seed_history(snapshot)
+        if count:
+            seeded_timestamps += 1
+            seeded_bars += count
+            latest_timestamp = int(timestamp)
+
+    return {
+        "type": "paper_warmup",
+        "split": split,
+        "requested_symbols": sorted(requested),
+        "seeded_timestamps": seeded_timestamps,
+        "seeded_bars": seeded_bars,
+        "latest_timestamp": latest_timestamp,
+        "state_path": str(engine.state_store.path) if engine.state_store is not None else None,
+    }
 
 
 def process_live_bar(
@@ -189,6 +256,18 @@ def main() -> int:
     parser.add_argument("--reset-state", action="store_true", help="Start from a fresh state even if a saved state exists")
     parser.add_argument("--no-save", action="store_true", help="Disable persistence writes")
     parser.add_argument("--no-gap-fill", action="store_true", help="Do not synthesize missing hourly bars")
+    parser.add_argument(
+        "--paper-warmup-split",
+        choices=["train", "val", "test"],
+        default=None,
+        help="Paper mode only: seed indicator history from cached historical bars before consuming live bars. This does not execute historical trades.",
+    )
+    parser.add_argument(
+        "--paper-warmup-bars",
+        type=int,
+        default=500,
+        help="Number of historical timestamps to use with --paper-warmup-split.",
+    )
     parser.add_argument(
         "--execution-mode",
         choices=["paper", "live"],
@@ -356,6 +435,17 @@ def main() -> int:
             engine = PaperTradingEngine(strategy, state_store=state_store)
             if not args.reset_state:
                 engine.load_state()
+            if args.paper_warmup_split:
+                print(
+                    json.dumps(
+                        warmup_paper_history(
+                            engine,
+                            split=args.paper_warmup_split,
+                            symbols=[symbol.upper() for symbol in args.symbols],
+                            limit=max(0, int(args.paper_warmup_bars)),
+                        )
+                    )
+                )
             run_loop(feed, args.poll_seconds, lambda bar_snapshot: process_paper_bar(engine, bar_snapshot))
 
             final_portfolio = engine.snapshot_portfolio()

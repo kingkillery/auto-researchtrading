@@ -6,6 +6,7 @@ Use this file to map user intent to the correct repo command and expected output
 
 - `docs/agent-harness.md`: repo-wide operating contract
 - `docs/backtest-5m.md`: 5-minute replay/backtest path
+- `docs/profitability-research-loop.md`: evidence ladder for profit-focused strategy research
 - `docs/jupiter-execution.md`: Jupiter paper/live execution modes and wallet validation
 - `docs/sol-baseline-strategy-v1.md`: SOL baseline implementation contract
 - `CODEBASE_KNOWLEDGE_GRAPH.json`: machine-readable capability and runtime surface map
@@ -68,6 +69,30 @@ Expected result:
 
 - Benchmark comparison output in the terminal
 
+### Improve profitability evidence
+
+Use when the user wants to make the repo or strategy more profitable, more economically credible, or more ready for paper/live promotion.
+
+Read first:
+
+```bash
+docs/profitability-research-loop.md
+```
+
+Primary research command:
+
+```bash
+uv run python tools/research_full_horizon.py
+```
+
+Expected result:
+
+- A stated evidence level from L0 to L6
+- Whether the result is full-horizon or time-capped
+- Leaderboard and cost-stress artifacts under `artifacts/research_full_horizon/`
+- Unknown gates called out explicitly
+- Any campaign note placed under `docs/improvements/<campaign>/`
+
 ### Run the 5-minute replay/backtest surface
 
 Use when the user is validating an intraday idea that does not fit the fixed hourly harness.
@@ -126,7 +151,12 @@ Use when the user wants replay or simulated fills instead of the fixed validatio
 ```bash
 uv run python paper_trade.py
 uv run python run_jupiter_live.py --execution-mode paper
+uv run python run_jupiter_live.py --execution-mode paper --paper-warmup-split val --paper-warmup-bars 500
+uv run python tools/paper_wallet_report.py
 ```
+
+`tools/paper_wallet_report.py` is the preferred read-only check for `paper trading profit`. Keep that phrase scoped to the paper wallet; it is not spendable real profit.
+`--paper-warmup-split` only seeds indicator history before live bars arrive. It does not execute historical trades, so any later fills remain live-feed paper fills.
 
 ### Run or control the local workbench
 
@@ -148,6 +178,10 @@ Important:
 
 - `workbench_ctl.py` auto-discovers the current local port from `~/.cache/autotrader/workbench/workbench.lock.json` when `--base-url` is omitted.
 - Local `fly_entrypoint.py` runs should stay on `http://127.0.0.1:8080` unless `WORKBENCH_PORT` is set explicitly.
+- The managed paper feed defaults to `BTC ETH SOL` to match the default strategy universe. Set `WORKBENCH_SYMBOLS='SOL'` before launch when the operator wants a SOL-only run.
+- Set `WORKBENCH_PAPER_PROFILE='<profile>'` before launching `fly_entrypoint.py` to run the managed paper feed on a specific experiment profile. If `STATE_PATH` is not set, the workbench uses a profile-specific paper state path so persisted strategy state does not silently restore another profile.
+- Set `WORKBENCH_PAPER_WARMUP_SPLIT='val'` and optionally `WORKBENCH_PAPER_WARMUP_BARS='500'` before launching `fly_entrypoint.py` to seed paper indicator history from cached data without executing historical trades.
+- Set `RESET_STATE='1'` on a sandbox relaunch when the managed paper feed should discard old persisted state before warmup.
 - `fly_entrypoint.py` is the launcher. `workbench_ctl.py` does not start the dashboard by itself.
 
 ### Recover a stale workbench runtime

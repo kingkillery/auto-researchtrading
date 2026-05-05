@@ -84,3 +84,11 @@ Keep local launches pinned to 127.0.0.1:8080 unless WORKBENCH_PORT is set explic
 ### New guardrail
 - Backend dedupe should suppress consecutive identical entries.
 
+## 2026-04-07T08:10:00Z - Duplicate save regression test 2
+
+### Snapshot
+- UTC timestamp: 2026-04-07T08:10:00Z
+
+### Primary driver
+- Operational
+

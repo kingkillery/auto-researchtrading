@@ -1,16 +1,18 @@
 """
-Exp32: Add Bollinger Band width as 6th signal for vol compression detection.
+Default hourly ensemble strategy with optional alternate profiles.
 
-Changes from exp28 (ATR 5.5, score 9.382):
-1. Add BB width signal: bullish when BB width is below median (compression = pending breakout)
-2. Keep MIN_VOTES at 4 but out of 6 signals now
-3. BB compression acts as a quality filter for entries
+The default path is a balanced six-signal ensemble:
+- fast RSI(8) regime check
+- EMA(7/26) trend confirmation
+- MACD(14,23,9) momentum confirmation
+- BB width compression as a stricter quality gate
+
 """
 
 import os
 
 import numpy as np
-from prepare import Signal, PortfolioState, BarData
+from prepare import Signal, PortfolioState, BarData, INITIAL_CAPITAL
 
 ACTIVE_SYMBOLS = ["BTC", "ETH", "SOL"]
 SYMBOL_WEIGHTS = {"BTC": 0.33, "ETH": 0.33, "SOL": 0.33}
@@ -32,6 +34,7 @@ MACD_SLOW = 23
 MACD_SIGNAL = 9
 
 BB_PERIOD = 7
+BB_COMPRESSION_PERCENTILE = 40
 
 FUNDING_LOOKBACK = 24
 FUNDING_BOOST = 0.0
@@ -86,9 +89,21 @@ class Strategy:
         self.atr_at_entry = {}
         self.btc_momentum = 0.0
         self.pyramided = {}
-        self.peak_equity = 100000.0
+        self.peak_equity = INITIAL_CAPITAL
         self.exit_bar = {}
         self.bar_count = 0
+
+    def _runtime_config(self):
+        config = {
+            "active_symbols": ACTIVE_SYMBOLS,
+            "symbol_weights": SYMBOL_WEIGHTS,
+            "base_position_pct": BASE_POSITION_PCT,
+            "cooldown_bars": COOLDOWN_BARS,
+            "min_entry_notional": 1.0,
+        }
+
+
+        return config
 
     def _profile_signal_plan(
         self,
@@ -114,8 +129,8 @@ class Strategy:
         take_profit_pct = TAKE_PROFIT_PCT
         size_scale = 1.0
 
-        trend_bull = [mom_bull := ret_short > dyn_threshold, vshort_bull := ret_vshort > dyn_threshold * 0.7, ema_bull, rsi > RSI_BULL, macd_hist > 0, bb_compressed]
-        trend_bear = [mom_bear := ret_short < -dyn_threshold, vshort_bear := ret_vshort < -dyn_threshold * 0.7, ema_bear, rsi < RSI_BEAR, macd_hist < 0, bb_compressed]
+        trend_bull = [ret_short > dyn_threshold, ret_vshort > dyn_threshold * 0.7, ema_bull, rsi > RSI_BULL, macd_hist > 0, bb_compressed]
+        trend_bear = [ret_short < -dyn_threshold, ret_vshort < -dyn_threshold * 0.7, ema_bear, rsi < RSI_BEAR, macd_hist < 0, bb_compressed]
 
         if self.profile == "trend_following":
             atr_stop_mult = 6.8
@@ -310,6 +325,12 @@ class Strategy:
     def on_bar(self, bar_data, portfolio):
         signals = []
         equity = portfolio.equity if portfolio.equity > 0 else portfolio.cash
+        runtime = self._runtime_config()
+        active_symbols = runtime["active_symbols"]
+        symbol_weights = runtime["symbol_weights"]
+        base_position_pct = runtime["base_position_pct"]
+        cooldown_bars = runtime["cooldown_bars"]
+        min_entry_notional = runtime["min_entry_notional"]
         self.bar_count += 1
 
         self.peak_equity = max(self.peak_equity, equity)
@@ -327,7 +348,7 @@ class Strategy:
         rank_map = {}
         if self.profile == "relative_strength_rotation":
             strengths = []
-            for rank_symbol in ACTIVE_SYMBOLS:
+            for rank_symbol in active_symbols:
                 if rank_symbol not in bar_data:
                     continue
                 rank_history = bar_data[rank_symbol].history["close"].values
@@ -338,7 +359,7 @@ class Strategy:
             strengths.sort(key=lambda item: item[1], reverse=True)
             rank_map = {rank_symbol: index + 1 for index, (rank_symbol, _) in enumerate(strengths)}
 
-        for symbol in ACTIVE_SYMBOLS:
+        for symbol in active_symbols:
             if symbol not in bar_data:
                 continue
             bd = bar_data[symbol]
@@ -356,29 +377,18 @@ class Strategy:
             ret_vshort = (closes[-1] - closes[-SHORT_WINDOW]) / closes[-SHORT_WINDOW]
             ret_short = (closes[-1] - closes[-MED_WINDOW]) / closes[-MED_WINDOW]
             ret_med = (closes[-1] - closes[-MED2_WINDOW]) / closes[-MED2_WINDOW]
-            ret_long = (closes[-1] - closes[-LONG_WINDOW]) / closes[-LONG_WINDOW]
-
-            mom_bull = ret_short > dyn_threshold
-            mom_bear = ret_short < -dyn_threshold
-            vshort_bull = ret_vshort > dyn_threshold * 0.7
-            vshort_bear = ret_vshort < -dyn_threshold * 0.7
-
             ema_fast_arr = ema(closes[-(EMA_SLOW+10):], EMA_FAST)
             ema_slow_arr = ema(closes[-(EMA_SLOW+10):], EMA_SLOW)
             ema_bull = ema_fast_arr[-1] > ema_slow_arr[-1]
             ema_bear = ema_fast_arr[-1] < ema_slow_arr[-1]
 
             rsi = calc_rsi(closes, RSI_PERIOD)
-            rsi_bull = rsi > RSI_BULL
-            rsi_bear = rsi < RSI_BEAR
 
             macd_hist = self._calc_macd(closes)
-            macd_bull = macd_hist > 0
-            macd_bear = macd_hist < 0
 
             # BB width: low percentile = compression = pending breakout
             bb_pctile = self._calc_bb_width_pctile(closes, BB_PERIOD)
-            bb_compressed = bb_pctile < 40
+            bb_compressed = bb_pctile < BB_COMPRESSION_PERCENTILE
 
             funding_rates = bd.history["funding_rate"].values[-FUNDING_LOOKBACK:]
             avg_funding = np.mean(funding_rates) if len(funding_rates) >= FUNDING_LOOKBACK else 0.0
@@ -418,16 +428,16 @@ class Strategy:
             bullish = bull_votes >= min_votes and btc_confirm
             bearish = bear_votes >= min_votes and btc_confirm
 
-            in_cooldown = (self.bar_count - self.exit_bar.get(symbol, -999)) < COOLDOWN_BARS
+            in_cooldown = (self.bar_count - self.exit_bar.get(symbol, -999)) < cooldown_bars
 
             vol_scale = 1.0
-            weight = SYMBOL_WEIGHTS.get(symbol, 0.33)
+            weight = symbol_weights.get(symbol, 0.33)
             if high_corr and symbol == "SOL":
                 weight *= 0.5
             mom_strength = abs(ret_short) / dyn_threshold
             strength_scale = max(0.65, min(1.35, mom_strength))
             strength_scale *= size_scale
-            size = equity * BASE_POSITION_PCT * weight * vol_scale * strength_scale * dd_scale
+            size = equity * base_position_pct * weight * vol_scale * strength_scale * dd_scale
 
             current_pos = portfolio.positions.get(symbol, 0.0)
             target = current_pos
@@ -438,12 +448,14 @@ class Strategy:
                     if bullish:
                         if avg_funding < 0:
                             funding_mult = 1.0 + FUNDING_BOOST
-                        target = size * funding_mult
+                        proposed = size * funding_mult
+                        target = proposed if abs(proposed) >= min_entry_notional else 0.0
                         self.pyramided[symbol] = False
                     elif bearish:
                         if avg_funding > 0:
                             funding_mult = 1.0 + FUNDING_BOOST
-                        target = -size * funding_mult
+                        proposed = -size * funding_mult
+                        target = proposed if abs(proposed) >= min_entry_notional else 0.0
                         self.pyramided[symbol] = False
             else:
                 if symbol in self.entry_prices and not self.pyramided.get(symbol, True):
@@ -491,9 +503,9 @@ class Strategy:
                     target = 0.0
 
                 if current_pos > 0 and bearish and not in_cooldown:
-                    target = -size
+                    target = -size if abs(size) >= min_entry_notional else 0.0
                 elif current_pos < 0 and bullish and not in_cooldown:
-                    target = size
+                    target = size if abs(size) >= min_entry_notional else 0.0
 
             if abs(target - current_pos) > 1.0:
                 signals.append(Signal(symbol=symbol, target_position=target))

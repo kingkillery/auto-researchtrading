@@ -7,6 +7,7 @@
   ],
   "optional_files": [
     "autoresearch-results.tsv",
+    "docs/trade_postmortems.md",
     "equity_curve.csv",
     "equity_curve_baseline.csv",
     "results.tsv"

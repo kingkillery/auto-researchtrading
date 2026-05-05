@@ -131,6 +131,16 @@ class PaperTradingEngine:
             timestamp=self.timestamp,
         )
 
+    def seed_history(self, snapshot: Mapping[str, Mapping[str, Any] | BarData]) -> int:
+        bar_data = self._build_bar_data(snapshot)
+        if not bar_data:
+            return 0
+
+        self.timestamp = max(bar.timestamp for bar in bar_data.values())
+        self.equity = self._mark_to_market(bar_data)
+        self.save_state()
+        return len(bar_data)
+
     def step(self, snapshot: Mapping[str, Mapping[str, Any] | BarData]) -> PaperStepResult:
         bar_data = self._build_bar_data(snapshot)
         if not bar_data:

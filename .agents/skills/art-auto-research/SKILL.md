@@ -20,6 +20,9 @@ Read `docs/agent-harness.md` before doing repo work. Treat it as the primary ope
 - For repo command selection, workflow routing, and artifact expectations, read `references/repo-tooling.md`.
 - For standard strategy validation, use the hourly harness: `uv run backtest.py`.
 - For benchmark comparison, use `uv run run_benchmarks.py`.
+- For profitability-improvement work, read `docs/profitability-research-loop.md` and treat profitability as an evidence ladder with a determinism gate, not a single backtest score. Use `uv run python tools/research_full_horizon.py` when you need full-horizon leaderboard and cost-stress artifacts.
+- Treat profit as real only when net money is realized in a controlled wallet and is available to reinvest or spend. Backtest, sandbox, and score outputs are evidence, not profit. Paper wallet gains may be called `paper trading profit` only when clearly scoped to paper trading; they are not spendable real profit.
+- For paper-wallet PnL checks, use `uv run python tools/paper_wallet_report.py` and report it as `paper trading profit`, not spendable real profit.
 - For 5-minute validation, read `docs/backtest-5m.md` and use `uv run python backtest_5m.py ...`.
 - For live Jupiter work, read `docs/jupiter-execution.md` before touching any live flags.
 - For SOL baseline strategy edits, read `docs/sol-baseline-strategy-v1.md` before editing `strategy.py`.
@@ -41,12 +44,13 @@ Read `docs/agent-harness.md` before doing repo work. Treat it as the primary ope
 
 ## Use this operating sequence
 
-1. Classify the task as one of: data prep, hourly backtest, 5-minute replay/backtest, benchmarking, reporting/export, paper execution, workbench control, or Jupiter live execution.
+1. Classify the task as one of: data prep, hourly backtest, 5-minute replay/backtest, benchmarking, reporting/export, paper execution, profitability improvement, workbench control, or Jupiter live execution.
 2. Read the matching repo doc if the task has a dedicated doc.
 3. Run the narrowest command that satisfies the request.
 4. Verify the expected artifact or output path exists when the command claims to generate one.
 5. If you changed docs, confirm all referenced commands and paths exist in the repo.
 6. If you changed strategy behavior, run the required validation command and summarize the score or failure mode.
+7. If a change is presented as profitability-related, name the evidence level reached from `docs/profitability-research-loop.md`, state whether the run was time-capped or full-horizon, and identify any unknown gate.
 
 ## Guardrails by surface
 

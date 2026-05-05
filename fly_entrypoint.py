@@ -37,7 +37,6 @@ def resolve_port(env: dict[str, str]) -> int:
 
 PORT = resolve_port(dict(os.environ))
 STRATEGY_SPEC = os.environ.get("STRATEGY_SPEC", "strategy:Strategy")
-STATE_PATH = Path(os.environ.get("STATE_PATH", default_state_path(STRATEGY_SPEC))).expanduser()
 RESET_STATE = os.environ.get("RESET_STATE", "").lower() in {"1", "true", "yes", "on"}
 ROOT = Path(__file__).resolve().parent
 LOGO_PATH = ROOT / "assets" / "logo.png"
@@ -52,7 +51,13 @@ WORKBENCH_ROOT = Path.home() / ".cache" / "autotrader" / "workbench"
 WORKBENCH_LOCK_PATH = WORKBENCH_ROOT / "workbench.lock.json"
 WORKBENCH_LOCK_FD: int | None = None
 WORKBENCH_AUTOSTART = os.environ.get("WORKBENCH_AUTOSTART", "1").lower() not in {"0", "false", "no", "off"}
-WORKBENCH_SYMBOLS = os.environ.get("WORKBENCH_SYMBOLS", "SOL").split()
+WORKBENCH_SYMBOLS = os.environ.get("WORKBENCH_SYMBOLS", "BTC ETH SOL").split()
+WORKBENCH_PAPER_PROFILE = os.environ.get(
+    "WORKBENCH_PAPER_PROFILE",
+    os.environ.get("AUTOTRADER_EXPERIMENT_PROFILE", ""),
+).strip().lower()
+WORKBENCH_PAPER_WARMUP_SPLIT = os.environ.get("WORKBENCH_PAPER_WARMUP_SPLIT", "").strip().lower()
+WORKBENCH_PAPER_WARMUP_BARS = int(os.environ.get("WORKBENCH_PAPER_WARMUP_BARS", "500"))
 WORKBENCH_POLL_SECONDS = float(os.environ.get("WORKBENCH_POLL_SECONDS", "30"))
 WORKBENCH_BAR_SECONDS = int(os.environ.get("WORKBENCH_BAR_SECONDS", "300"))
 WORKBENCH_EXPERIMENT_DELAY = float(os.environ.get("WORKBENCH_EXPERIMENT_DELAY", "5"))
@@ -61,6 +66,22 @@ WORKBENCH_EXPERIMENT_MANIFEST = Path(
 ).expanduser()
 UV_COMMAND = os.environ.get("UV_COMMAND", "uv")
 AUTH = WorkbenchAuth(load_auth_config_from_env(dict(os.environ)))
+
+
+def resolve_state_path() -> Path:
+    if os.environ.get("STATE_PATH"):
+        return Path(os.environ["STATE_PATH"]).expanduser()
+    base = default_state_path(STRATEGY_SPEC)
+    if not WORKBENCH_PAPER_PROFILE:
+        return base
+    safe_profile = "".join(
+        char if char.isalnum() or char in {"-", "_"} else "_"
+        for char in WORKBENCH_PAPER_PROFILE
+    )
+    return base.with_name(f"{base.stem}_{safe_profile}{base.suffix}")
+
+
+STATE_PATH = resolve_state_path()
 
 
 def build_engine() -> PaperTradingEngine:
@@ -463,11 +484,20 @@ def tail_text(path: Path, lines: int = 10) -> list[str]:
 
 
 class ManagedProcess:
-    def __init__(self, *, name: str, command: list[str], log_path: Path, cwd: Path) -> None:
+    def __init__(
+        self,
+        *,
+        name: str,
+        command: list[str],
+        log_path: Path,
+        cwd: Path,
+        env_overrides: dict[str, str] | None = None,
+    ) -> None:
         self.name = name
         self.command = command
         self.log_path = log_path
         self.cwd = cwd
+        self.env_overrides = dict(env_overrides or {})
         self._proc: subprocess.Popen[str] | None = None
         self._log_handle = None
         self._lock = threading.RLock()
@@ -514,6 +544,7 @@ class ManagedProcess:
             creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
             env = os.environ.copy()
             env["PYTHONUNBUFFERED"] = "1"
+            env.update(self.env_overrides)
             popen_kwargs: dict[str, Any] = {
                 "cwd": str(self.cwd),
                 "stdout": self._log_handle,
@@ -591,6 +622,17 @@ class WorkbenchSupervisor:
             "--state",
             str(STATE_PATH),
         ]
+        if RESET_STATE:
+            paper_command.append("--reset-state")
+        if WORKBENCH_PAPER_WARMUP_SPLIT:
+            paper_command.extend(
+                [
+                    "--paper-warmup-split",
+                    WORKBENCH_PAPER_WARMUP_SPLIT,
+                    "--paper-warmup-bars",
+                    str(WORKBENCH_PAPER_WARMUP_BARS),
+                ]
+            )
         manager_command = [
             UV_COMMAND,
             "run",
@@ -607,12 +649,16 @@ class WorkbenchSupervisor:
             "--cycle-delay-seconds",
             str(WORKBENCH_EXPERIMENT_DELAY),
         ]
+        paper_env = {}
+        if WORKBENCH_PAPER_PROFILE:
+            paper_env["AUTOTRADER_EXPERIMENT_PROFILE"] = WORKBENCH_PAPER_PROFILE
 
         self.paper = ManagedProcess(
             name="paper-feed",
             command=paper_command,
             log_path=self.root / "paper-feed.log",
             cwd=ROOT,
+            env_overrides=paper_env,
         )
         self.experiment_manager = ManagedProcess(
             name="experiment-manager",
@@ -729,6 +775,8 @@ class WorkbenchSupervisor:
                     "url": f"http://127.0.0.1:{PORT}/",
                 },
                 "paper": self.paper.snapshot(),
+                "paper_profile": WORKBENCH_PAPER_PROFILE or "default",
+                "paper_warmup_split": WORKBENCH_PAPER_WARMUP_SPLIT or None,
                 "experiment_manager": {
                     **manager_snapshot,
                     "state": manager_state_name,
@@ -859,6 +907,8 @@ def dashboard_payload() -> dict[str, Any]:
         "meta": {
             "generated_at": utc_now(),
             "strategy_spec": STRATEGY_SPEC,
+            "paper_profile": WORKBENCH_PAPER_PROFILE or "default",
+            "paper_warmup_split": WORKBENCH_PAPER_WARMUP_SPLIT or None,
             "state_path": str(STATE_PATH),
             "workbench_root": str(WORKBENCH.root),
             "experiment_manifest_path": str(WORKBENCH_EXPERIMENT_MANIFEST),

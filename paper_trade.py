@@ -26,13 +26,15 @@ def load_strategy(spec: str) -> Any:
     return strategy_cls()
 
 
-def snapshot_from_rows(rows: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def snapshot_from_rows(rows: dict[str, Any], timestamp: int | None = None) -> dict[str, dict[str, Any]]:
     snapshot: dict[str, dict[str, Any]] = {}
     for symbol, row in rows.items():
         if hasattr(row, "to_dict"):
             snapshot[symbol] = dict(row.to_dict())
         else:
             snapshot[symbol] = dict(row)
+        if timestamp is not None:
+            snapshot[symbol].setdefault("timestamp", timestamp)
     return snapshot
 
 
@@ -85,7 +87,7 @@ def run_replay(engine: PaperTradingEngine, split: str, limit: int | None = None)
         if not rows:
             continue
 
-        emit_step(engine.step(snapshot_from_rows(rows)))
+        emit_step(engine.step(snapshot_from_rows(rows, timestamp)))
 
 
 def run_jsonl_stream(engine: PaperTradingEngine) -> None:
