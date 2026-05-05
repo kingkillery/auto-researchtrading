@@ -31,8 +31,10 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 10000,
         "split": "val",
         "search_space": "trend_following",
-        "desired_state": "paused",
-        "focus_tier": "parked",
+        "desired_state": "running",
+        "focus_tier": "primary",
+        "auto_pause_failed_gate_streak": 1,
+        "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"],
     },
     {
         "id": "perps-mean-revert",
@@ -44,6 +46,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "search_space": "mean_reversion",
         "desired_state": "paused",
         "focus_tier": "parked",
+        "auto_pause_failed_gate_streak": 1,
+        "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"],
     },
     {
         "id": "perps-regime-switch",
@@ -53,8 +57,10 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "paper_budget_usd": 15000,
         "split": "val",
         "search_space": "regime_switching",
-        "desired_state": "running",
-        "focus_tier": "primary",
+        "desired_state": "paused",
+        "focus_tier": "parked",
+        "auto_pause_failed_gate_streak": 3,
+        "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"],
     },
     {
         "id": "perps-borrow-decay",
@@ -66,6 +72,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "search_space": "carry_aware_exits",
         "desired_state": "running",
         "focus_tier": "secondary",
+        "auto_pause_failed_gate_streak": 2,
+        "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"],
     },
     {
         "id": "perps-impact-aware-sizing",
@@ -76,7 +84,9 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "split": "val",
         "search_space": "impact_aware_sizing",
         "desired_state": "running",
-        "focus_tier": "secondary",
+        "focus_tier": "primary",
+        "auto_pause_failed_gate_streak": 2,
+        "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"],
     },
     {
         "id": "perps-liquidation-buffer",
@@ -87,7 +97,9 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "split": "val",
         "search_space": "liquidation_buffer",
         "desired_state": "running",
-        "focus_tier": "secondary",
+        "focus_tier": "primary",
+        "auto_pause_failed_gate_streak": 2,
+        "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"],
     },
     {
         "id": "perps-limit-pullback",
@@ -99,6 +111,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "search_space": "limit_pullback",
         "desired_state": "paused",
         "focus_tier": "parked",
+        "auto_pause_failed_gate_streak": 1,
+        "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"],
     },
     {
         "id": "perps-relative-strength",
@@ -110,6 +124,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "search_space": "relative_strength_rotation",
         "desired_state": "paused",
         "focus_tier": "parked",
+        "auto_pause_failed_gate_streak": 1,
+        "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"],
     },
     {
         "id": "perps-compression-breakout",
@@ -120,7 +136,9 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "split": "val",
         "search_space": "compression_breakout",
         "desired_state": "running",
-        "focus_tier": "primary",
+        "focus_tier": "secondary",
+        "auto_pause_failed_gate_streak": 3,
+        "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"],
     },
     {
         "id": "perps-failure-reversal",
@@ -132,6 +150,8 @@ DEFAULT_EXPERIMENT_MANIFEST: list[dict[str, Any]] = [
         "search_space": "failure_reversal",
         "desired_state": "paused",
         "focus_tier": "parked",
+        "auto_pause_failed_gate_streak": 1,
+        "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"],
     },
 ]
 
@@ -390,6 +410,9 @@ class ExperimentConfig:
     paper_budget_usd: float
     search_space: str
     desired_state: str
+    focus_tier: str
+    auto_pause_failed_gate_streak: int
+    auto_pause_failed_gates: tuple[str, ...]
     max_drawdown_pct: float
     min_trades: int
     min_score_delta: float
@@ -422,6 +445,7 @@ class ExperimentManager:
         self._configs = self._load_configs()
         for config in self._configs:
             self._experiment_state[config.id] = self._default_experiment_state(config)
+        self._restore_best_candidates()
 
     def _load_configs(self) -> list[ExperimentConfig]:
         if self.manifest_path.exists():
@@ -453,6 +477,14 @@ class ExperimentManager:
                 raise ValueError(
                     f"experiment {experiment_id} has invalid desired_state={desired_state!r}; expected running|paused|stopped"
                 )
+            focus_tier = str(item.get("focus_tier", "default")).strip().lower() or "default"
+            auto_pause_failed_gate_streak = int(item.get("auto_pause_failed_gate_streak", 0))
+            raw_auto_pause_failed_gates = item.get("auto_pause_failed_gates", [])
+            if isinstance(raw_auto_pause_failed_gates, str):
+                raw_auto_pause_failed_gates = [raw_auto_pause_failed_gates]
+            auto_pause_failed_gates = tuple(
+                str(gate).strip() for gate in raw_auto_pause_failed_gates if str(gate).strip()
+            )
             experiment_dir = base_dir / item["id"]
             configs.append(
                 ExperimentConfig(
@@ -464,6 +496,9 @@ class ExperimentManager:
                     paper_budget_usd=float(item.get("paper_budget_usd", 10000)),
                     search_space=str(item.get("search_space", "unknown")),
                     desired_state=desired_state,
+                    focus_tier=focus_tier,
+                    auto_pause_failed_gate_streak=auto_pause_failed_gate_streak,
+                    auto_pause_failed_gates=auto_pause_failed_gates,
                     max_drawdown_pct=float(item.get("max_drawdown_pct", 15.0)),
                     min_trades=int(item.get("min_trades", 20)),
                     min_score_delta=float(item.get("min_score_delta", 0.0)),
@@ -496,9 +531,12 @@ class ExperimentManager:
             "hypothesis": config.hypothesis,
             "objective": config.objective,
             "search_space": config.search_space,
+            "focus_tier": config.focus_tier,
             "symbols": list(config.symbols),
             "split": config.split,
             "paper_budget_usd": config.paper_budget_usd,
+            "auto_pause_failed_gate_streak": config.auto_pause_failed_gate_streak,
+            "auto_pause_failed_gates": list(config.auto_pause_failed_gates),
             "max_drawdown_pct": config.max_drawdown_pct,
             "min_trades": config.min_trades,
             "min_score_delta": config.min_score_delta,
@@ -530,9 +568,30 @@ class ExperimentManager:
             "degraded_reasons": [],
             "health": "idle",
             "health_reasons": [],
+            "failed_gate_streak": 0,
+            "auto_pause_reason": None,
             "restart_nonce": 0,
             "command": [],
         }
+
+    def _restore_best_candidates(self) -> None:
+        for config in self._configs:
+            best_path = config.artifact_dir / "best-candidate.json"
+            if not best_path.exists():
+                continue
+            try:
+                payload = json.loads(best_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            metrics = payload.get("metrics") if isinstance(payload.get("metrics"), dict) else {}
+            candidate_score = metrics.get("score") if isinstance(metrics.get("score"), (int, float)) else None
+            with self._lock:
+                state = self._experiment_state[config.id]
+                if candidate_score is not None:
+                    state["best_score"] = float(candidate_score)
+                state["best_iteration"] = payload.get("iteration")
+                state["best_metrics"] = metrics
+                state["best_cycle_record_path"] = payload.get("cycle_record_path")
 
     def _build_command(self, config: ExperimentConfig) -> list[str]:
         return [
@@ -578,6 +637,8 @@ class ExperimentManager:
                 "max_drawdown_pct": config.max_drawdown_pct,
                 "min_trades": config.min_trades,
                 "min_score_delta": config.min_score_delta,
+                "auto_pause_failed_gate_streak": config.auto_pause_failed_gate_streak,
+                "auto_pause_failed_gates": list(config.auto_pause_failed_gates),
             },
             "planned_at": utc_now(),
         }
@@ -657,6 +718,20 @@ class ExperimentManager:
             status = str((item.get("last_decision") or {}).get("status", "none"))
             counts[status] = counts.get(status, 0) + 1
         return counts
+
+    def _focus_tier_counts(self, experiments: list[dict[str, Any]]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for item in experiments:
+            tier = str(item.get("focus_tier", "default"))
+            counts[tier] = counts.get(tier, 0) + 1
+        return counts
+
+    def _update_experiment_control_state(self, experiment_id: str, desired_state: str) -> None:
+        control = self._load_control()
+        experiments = control.setdefault("experiments", {})
+        experiment = experiments.setdefault(experiment_id, {"desired_state": desired_state, "restart_nonce": 0})
+        experiment["desired_state"] = desired_state
+        write_json(self.control_path, control)
 
     def _set_phase(
         self,
@@ -773,6 +848,7 @@ class ExperimentManager:
                     "leader_score": leader.get("best_score") if leader else None,
                     "phase_counts": self._phase_counts(experiments),
                     "decision_counts": self._decision_counts(experiments),
+                    "focus_tier_counts": self._focus_tier_counts(experiments),
                 },
                 "experiments": experiments,
             }
@@ -990,8 +1066,49 @@ class ExperimentManager:
             degraded_reasons=degraded_reasons,
             baseline_score=baseline_score,
         )
+        failed_gates = {str(name) for name in verification.get("failed_gates", [])}
+        tracked_failed_gates = failed_gates.intersection(config.auto_pause_failed_gates)
+        auto_pause_reason: str | None = None
+        failed_gate_streak = 0
         with self._lock:
-            self._experiment_state[config.id]["last_verification"] = verification
+            state = self._experiment_state[config.id]
+            state["last_verification"] = verification
+            if interrupted_reason:
+                failed_gate_streak = int(state.get("failed_gate_streak", 0) or 0)
+            elif config.auto_pause_failed_gate_streak > 0 and tracked_failed_gates:
+                failed_gate_streak = int(state.get("failed_gate_streak", 0) or 0) + 1
+                state["failed_gate_streak"] = failed_gate_streak
+            else:
+                failed_gate_streak = 0
+                state["failed_gate_streak"] = 0
+                state["auto_pause_reason"] = None
+            if (
+                not interrupted_reason
+                and config.auto_pause_failed_gate_streak > 0
+                and tracked_failed_gates
+                and failed_gate_streak >= config.auto_pause_failed_gate_streak
+                and state.get("desired_state") == "running"
+            ):
+                auto_pause_reason = (
+                    f"auto_pause_after_failed_gates:{','.join(sorted(tracked_failed_gates))}"
+                )
+                state["desired_state"] = "paused"
+                state["state"] = "paused"
+                state["auto_pause_reason"] = auto_pause_reason
+        if auto_pause_reason:
+            self._update_experiment_control_state(config.id, "paused")
+            self._emit_event(
+                "experiment_auto_paused",
+                experiment_id=config.id,
+                payload={
+                    "iteration": iteration,
+                    "search_space": config.search_space,
+                    "cycle_record_path": str(cycle_record_path),
+                    "failed_gate_streak": failed_gate_streak,
+                    "tracked_failed_gates": sorted(tracked_failed_gates),
+                    "reason": auto_pause_reason,
+                },
+            )
         self._emit_event(
             "candidate_verified",
             experiment_id=config.id,
@@ -1002,6 +1119,9 @@ class ExperimentManager:
                 "phase_detail": "checking_experimental_gates",
                 "cycle_record_path": str(cycle_record_path),
                 "verification": verification,
+                "failed_gate_streak": failed_gate_streak,
+                "tracked_failed_gates": sorted(tracked_failed_gates),
+                "auto_pause_reason": auto_pause_reason,
             },
         )
         self._set_phase(
@@ -1011,6 +1131,9 @@ class ExperimentManager:
             payload={"cycle_record_path": str(cycle_record_path)},
         )
         decision = self._decision_snapshot(config, verification)
+        if auto_pause_reason:
+            decision["auto_paused"] = True
+            decision["auto_pause_reason"] = auto_pause_reason
         with self._lock:
             state = self._experiment_state[config.id]
             state["last_decision"] = decision

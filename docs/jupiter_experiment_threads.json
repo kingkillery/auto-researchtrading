@@ -7,8 +7,10 @@
     "paper_budget_usd": 10000,
     "split": "val",
     "search_space": "trend_following",
-    "desired_state": "paused",
-    "focus_tier": "parked"
+    "desired_state": "running",
+    "focus_tier": "primary",
+    "auto_pause_failed_gate_streak": 1,
+    "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"]
   },
   {
     "id": "perps-mean-revert",
@@ -19,7 +21,9 @@
     "split": "val",
     "search_space": "mean_reversion",
     "desired_state": "paused",
-    "focus_tier": "parked"
+    "focus_tier": "parked",
+    "auto_pause_failed_gate_streak": 1,
+    "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"]
   },
   {
     "id": "perps-regime-switch",
@@ -29,8 +33,10 @@
     "paper_budget_usd": 15000,
     "split": "val",
     "search_space": "regime_switching",
-    "desired_state": "running",
-    "focus_tier": "primary"
+    "desired_state": "paused",
+    "focus_tier": "parked",
+    "auto_pause_failed_gate_streak": 3,
+    "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"]
   },
   {
     "id": "perps-borrow-decay",
@@ -41,7 +47,9 @@
     "split": "val",
     "search_space": "carry_aware_exits",
     "desired_state": "running",
-    "focus_tier": "secondary"
+    "focus_tier": "secondary",
+    "auto_pause_failed_gate_streak": 2,
+    "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"]
   },
   {
     "id": "perps-impact-aware-sizing",
@@ -52,7 +60,9 @@
     "split": "val",
     "search_space": "impact_aware_sizing",
     "desired_state": "running",
-    "focus_tier": "secondary"
+    "focus_tier": "primary",
+    "auto_pause_failed_gate_streak": 2,
+    "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"]
   },
   {
     "id": "perps-liquidation-buffer",
@@ -63,7 +73,9 @@
     "split": "val",
     "search_space": "liquidation_buffer",
     "desired_state": "running",
-    "focus_tier": "secondary"
+    "focus_tier": "primary",
+    "auto_pause_failed_gate_streak": 2,
+    "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"]
   },
   {
     "id": "perps-limit-pullback",
@@ -74,7 +86,9 @@
     "split": "val",
     "search_space": "limit_pullback",
     "desired_state": "paused",
-    "focus_tier": "parked"
+    "focus_tier": "parked",
+    "auto_pause_failed_gate_streak": 1,
+    "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"]
   },
   {
     "id": "perps-relative-strength",
@@ -85,7 +99,9 @@
     "split": "val",
     "search_space": "relative_strength_rotation",
     "desired_state": "paused",
-    "focus_tier": "parked"
+    "focus_tier": "parked",
+    "auto_pause_failed_gate_streak": 1,
+    "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"]
   },
   {
     "id": "perps-compression-breakout",
@@ -96,7 +112,9 @@
     "split": "val",
     "search_space": "compression_breakout",
     "desired_state": "running",
-    "focus_tier": "primary"
+    "focus_tier": "secondary",
+    "auto_pause_failed_gate_streak": 3,
+    "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"]
   },
   {
     "id": "perps-failure-reversal",
@@ -107,6 +125,8 @@
     "split": "val",
     "search_space": "failure_reversal",
     "desired_state": "paused",
-    "focus_tier": "parked"
+    "focus_tier": "parked",
+    "auto_pause_failed_gate_streak": 1,
+    "auto_pause_failed_gates": ["max_drawdown_within_limit", "process_exit_clean", "score_available"]
   }
 ]
