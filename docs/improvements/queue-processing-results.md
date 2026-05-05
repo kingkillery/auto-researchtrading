@@ -112,3 +112,57 @@ Found in:
 - [ ] `open-issues.md` Issue #1 needs update (stale)
 - [ ] `profitability-evidence-loop/README.md` needs correction
 - [ ] `paper-feed.log` needs cleanup / truncation guard
+
+
+---
+
+## Full-Horizon Backtest Results — regime_switching (2026-05-05)
+
+**Command:** `uv run python tools/research_full_horizon.py --split val --profile regime_switching`
+**Status:** Completed (exit code 0)
+**Coverage:** 100.00% (6,552 / 6,552 bars)
+**Backtest time:** ~295 seconds
+
+### Leaderboard
+
+| Rank | Strategy | Score | Return% | Trades | WinRate% | ProfitFactor | MaxDD% | Status |
+|------|----------|-------|---------|--------|----------|--------------|--------|--------|
+| 1 | **current_strategy (regime_switching)** | **14.133141** | **79.68%** | 6,469 | 74.48 | 7.96 | 1.22 | ✅ full-horizon |
+| 2 | funding_arb | -0.128636 | -0.62% | 879 | — | — | — | full-horizon |
+| 3 | regime_mm | -0.320249 | -3.12% | 12,858 | — | — | — | full-horizon |
+| 4 | mean_reversion | -3.967560 | -26.17% | 3,185 | — | — | — | full-horizon |
+| 5 | avellaneda_mm | -999.000000 | 0.00% | 0 | — | — | — | full-horizon |
+| 6 | momentum_breakout | -999.000000 | 0.00% | 0 | — | — | — | full-horizon |
+
+### Cost Stress Test
+
+| Cost Multiplier | Fee Rate | Slippage (bps) | Score | Return% | WinRate% | Profit Factor |
+|-----------------|----------|----------------|-------|---------|----------|---------------|
+| 1x (default) | 0.05% | 1.0 | 14.133141 | 79.68% | 74.48% | 7.96 |
+| 2x | 0.10% | 2.0 | 10.930968 | 56.70% | 73.37% | 7.52 |
+| 3x | 0.15% | 5.0 | 6.865714 | 32.40% | 70.19% | 6.34 |
+
+### Verdict
+
+- **Beats all benchmarks** by a wide margin ✅
+- **Survives 3x cost stress** with positive score (6.87) and 32% return ✅
+- **Drawdown is controlled** at 1.22% ✅
+- **Full-horizon score (14.13)** is lower than time-capped experiment score (~20.45) because 120s truncation covered only the most favorable portion of the data ⚠️
+- **Research-grade claim:** This is L4 evidence (backtest on validation data, full horizon). L5 requires live paper PnL.
+
+### Comparison: Time-Capped vs Full-Horizon
+
+| Metric | Time-Capped (120s) | Full-Horizon | Delta |
+|--------|-------------------|--------------|-------|
+| Score | ~20.45 | 14.13 | -31% |
+| Return% | ~2.35% | 79.68% | +33x |
+| Trades | ~1,753 | 6,469 | +3.7x |
+| Coverage | ~27% | 100% | +73pp |
+
+**Key insight:** Time-capped backtests dramatically understate return because they truncate before the strategy compounds. The score is inflated by selection bias (favorable early data), but the true score on full data is 14.13 — still strong.
+
+### Artifacts
+
+- `artifacts/research_full_horizon/summary.json`
+- `artifacts/research_full_horizon/leaderboard.csv`
+- `artifacts/research_full_horizon/cost_stress.csv`
