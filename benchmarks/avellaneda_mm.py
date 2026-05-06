@@ -1,26 +1,19 @@
-"""Avellaneda-Stoikov inventory-aware market maker — ported from agent-cli."""
+"""Avellaneda-Stoikov inspired mean-reversion — adapted for hourly bars."""
 import math
 import numpy as np
 from prepare import Signal, PortfolioState, BarData
 
-GAMMA = 0.05
-K = 1.5
-POSITION_SIZE_PCT = 0.08
-MAX_INVENTORY_PCT = 0.25
-MIN_SPREAD_BPS = 15.0
-MAX_SPREAD_BPS = 300.0
-VOL_WINDOW = 36
+POSITION_SIZE_PCT = 0.05
+MAX_HOLD_BARS = 24
+STOP_LOSS_PCT = 0.015
+PROFIT_TARGET_PCT = 0.008
+EMA_PERIOD = 12
 ACTIVE_SYMBOLS = ["BTC", "ETH", "SOL"]
 
 class Strategy:
     def __init__(self):
         self.entry_prices = {}
-
-    def _compute_vol(self, closes):
-        if len(closes) < 3:
-            return 0.001
-        log_rets = np.diff(np.log(closes[-VOL_WINDOW:]))
-        return max(np.std(log_rets), 1e-6)
+        self.bars_held = {}
 
     def on_bar(self, bar_data: dict, portfolio: PortfolioState) -> list:
         signals = []
@@ -30,64 +23,49 @@ class Strategy:
             if symbol not in bar_data:
                 continue
             bd = bar_data[symbol]
-            if len(bd.history) < VOL_WINDOW:
+            if len(bd.history) < EMA_PERIOD + 2:
                 continue
 
             closes = bd.history["close"].values
+            ema_val = np.mean(closes[-EMA_PERIOD:])
             mid = bd.close
-            sigma = self._compute_vol(closes)
-            sigma_dollar = sigma * mid
-
             current_pos = portfolio.positions.get(symbol, 0.0)
-            max_inv = equity * MAX_INVENTORY_PCT
-            q = current_pos / max_inv if max_inv > 0 else 0.0
-
-            # Reservation price: skew away from inventory
-            T = 1.0
-            r_price = mid - q * GAMMA * sigma_dollar**2 * T
-
-            # Optimal spread
-            spread = GAMMA * sigma_dollar**2 * T
-            if GAMMA > 0:
-                spread += (2.0 / GAMMA) * math.log(1.0 + GAMMA / K)
-
-            half_spread = max(mid * MIN_SPREAD_BPS / 10000, min(spread / 2, mid * MAX_SPREAD_BPS / 10000))
-
-            # Size scaled by inventory utilization
-            utilization = abs(current_pos) / max_inv if max_inv > 0 else 0
-            size = equity * POSITION_SIZE_PCT * max(0.1, 1.0 - utilization)
-
-            # Directional signal based on reservation price vs mid
-            price_diff_pct = (r_price - mid) / mid
+            size = equity * POSITION_SIZE_PCT
             target = current_pos
 
-            # Entry when flat
-            if current_pos == 0:
-                if price_diff_pct > 0.001:
-                    target = size
-                elif price_diff_pct < -0.001:
-                    target = -size
-            else:
-                # Inventory reduction when reservation price flips
-                if q > 0 and price_diff_pct < -0.0005:
-                    target = 0.0
-                elif q < 0 and price_diff_pct > 0.0005:
-                    target = 0.0
+            # Mean-reversion: deviation from EMA
+            dev = (mid - ema_val) / ema_val if ema_val > 0 else 0
 
-                # Stop loss
-                if symbol in self.entry_prices:
-                    entry = self.entry_prices[symbol]
-                    pnl = (mid - entry) / entry
-                    if current_pos < 0:
-                        pnl = -pnl
-                    if pnl < -0.03:
-                        target = 0.0
+            if current_pos == 0:
+                # Enter when price deviates from EMA
+                if dev < -STOP_LOSS_PCT:
+                    target = size  # price below EMA → buy
+                elif dev > STOP_LOSS_PCT:
+                    target = -size  # price above EMA → sell
+            else:
+                self.bars_held[symbol] = self.bars_held.get(symbol, 0) + 1
+                entry = self.entry_prices.get(symbol, mid)
+                pnl = (mid - entry) / entry
+                if current_pos < 0:
+                    pnl = -pnl
+
+                # Exit on profit target, stop loss, or max hold
+                if pnl > PROFIT_TARGET_PCT:
+                    target = 0.0
+                elif pnl < -STOP_LOSS_PCT:
+                    target = 0.0
+                elif self.bars_held.get(symbol, 0) >= MAX_HOLD_BARS:
+                    target = 0.0
+                elif abs(dev) < 0.001:
+                    target = 0.0  # price returned to EMA
 
             if abs(target - current_pos) > 1.0:
                 signals.append(Signal(symbol=symbol, target_position=target))
                 if target != 0 and current_pos == 0:
                     self.entry_prices[symbol] = mid
+                    self.bars_held[symbol] = 0
                 elif target == 0:
                     self.entry_prices.pop(symbol, None)
+                    self.bars_held.pop(symbol, None)
 
         return signals
