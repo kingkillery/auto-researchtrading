@@ -19,5 +19,11 @@
     "win_rate_pct": 70.023557,
     "profit_factor": 5.335059,
     "annual_turnover": 49989178.35
+  },
+  "impact_aware_sizing_5m_test": {
+    "score": 14.65,
+    "total_return_pct": 10.9,
+    "max_drawdown_pct": 0.53,
+    "num_trades": 13837
   }
 }
