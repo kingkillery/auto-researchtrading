@@ -1,0 +1,23 @@
+{
+  "hourly_test": {
+    "profile": "impact_aware_sizing",
+    "score": 14.641032,
+    "sharpe": 14.641032,
+    "total_return_pct": 64.999042,
+    "max_drawdown_pct": 0.431477,
+    "num_trades": 7607,
+    "win_rate_pct": 74.302726,
+    "annual_turnover": 49652902.31
+  },
+  "five_min_test": {
+    "profile": "compression_breakout + dynamic sizing",
+    "score": 18.161756,
+    "sharpe": 18.161756,
+    "total_return_pct": 12.944638,
+    "max_drawdown_pct": 0.418672,
+    "num_trades": 11250,
+    "win_rate_pct": 70.023557,
+    "profit_factor": 5.335059,
+    "annual_turnover": 49989178.35
+  }
+}
