@@ -230,6 +230,7 @@ class Strategy:
             min_votes = 4
             atr_stop_mult = 5.8
             take_profit_pct = 0.05
+            size_scale = max(0.3, min(1.0, TARGET_VOL / max(realized_vol, TARGET_VOL)))
             bull_checks = [bb_compressed, ret_short > dyn_threshold, ret_vshort > dyn_threshold * 0.7, ema_bull, macd_hist > 0, ret_med > 0]
             bear_checks = [bb_compressed, ret_short < -dyn_threshold, ret_vshort < -dyn_threshold * 0.7, ema_bear, macd_hist < 0, ret_med < 0]
         elif self.profile == "failure_reversal":
