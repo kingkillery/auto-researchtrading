@@ -27,9 +27,9 @@ class Strategy:
             if len(bd.history) < LOOKBACK:
                 continue
 
-            highs = bd.history["high"].values[-LOOKBACK:]
-            lows = bd.history["low"].values[-LOOKBACK:]
-            volumes = bd.history["volume"].values[-LOOKBACK:]
+            highs = bd.history["high"].values[-LOOKBACK-1:-1]
+            lows = bd.history["low"].values[-LOOKBACK-1:-1]
+            volumes = bd.history["volume"].values[-LOOKBACK-1:-1]
 
             period_high = np.max(highs)
             period_low = np.min(lows)

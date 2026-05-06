@@ -22,8 +22,8 @@ SHORT_WINDOW = 6
 MED_WINDOW = 12
 MED2_WINDOW = 24
 LONG_WINDOW = 36
-EMA_FAST = 7
-EMA_SLOW = 26
+EMA_FAST = 10  # tuned from grid search: 17.49 vs 17.47 at 7/26
+EMA_SLOW = 34  # tuned from grid search
 RSI_PERIOD = 8
 RSI_BULL = 50
 RSI_BEAR = 50
@@ -34,7 +34,7 @@ MACD_FAST = 14
 MACD_SLOW = 23
 MACD_SIGNAL = 9
 
-BB_PERIOD = 7
+BB_PERIOD = 10  # tuned from grid search: 17.52 vs 17.47 at 7
 BB_COMPRESSION_PERCENTILE = 40
 
 FUNDING_LOOKBACK = 24
@@ -45,7 +45,7 @@ TARGET_VOL = 0.015
 ATR_LOOKBACK = 24
 ATR_STOP_MULT = 5.5
 TAKE_PROFIT_PCT = 99.0
-BASE_THRESHOLD = 0.012
+BASE_THRESHOLD = 0.008  # tuned from grid search: 17.47 vs 16.84 at 0.012
 BTC_OPPOSE_THRESHOLD = -99.0
 
 PYRAMID_THRESHOLD = 0.015
@@ -59,7 +59,7 @@ DD_REDUCE_SCALE = 0.5
 COOLDOWN_BARS = 2
 MIN_VOTES = 4  # out of 6 now
 
-DEFAULT_EXPERIMENT_PROFILE = "default"
+DEFAULT_EXPERIMENT_PROFILE = "impact_aware_sizing"  # promoted from hourly profile sweep (score 17.53)
 
 def ema(values, span):
     alpha = 2.0 / (span + 1)
